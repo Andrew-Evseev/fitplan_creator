@@ -1,0 +1,76 @@
+Set-Content -Path ".gitignore" -Value @"
+# Flutter
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.flutter/
+.dart_tool/
+
+# Android
+android/**/gradle-wrapper.jar
+android/.gradle
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/key.properties
+**/*.jks
+
+# iOS
+ios/**/*.mode1v3
+ios/**/*.mode2v3
+ios/**/*.moved-aside
+ios/**/*.pbxuser
+ios/**/*.perspectivev3
+ios/**/*sync/
+ios/.symlinks/
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.flx
+ios/Flutter/app.zip
+ios/Flutter/flutter_assets/
+ios/Flutter/flutter_export_environment.sh
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Build
+build/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+
+# VS Code
+.vscode/
+
+# IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Firebase
+firebase_options.dart
+*.env
+*.env.local
+*.env*.local
+
+# Dart
+pubspec.lock
+.packages
+.dart_tool/
+
+# Web
+web/.last_build_id
+"@
