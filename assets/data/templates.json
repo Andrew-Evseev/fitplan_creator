@@ -1,0 +1,53 @@
+[
+  {
+    "id": "beginner_weight_loss",
+    "name": "Для начинающих: похудение",
+    "description": "Круговые тренировки 3 раза в неделю",
+    "target": ["weight_loss", "tone"],
+    "level": "beginner",
+    "equipmentRequired": ["bodyweight"],
+    "weeklyPlan": {
+      "monday": [
+        {"exerciseId": "pushups", "sets": 3, "reps": "10-12"},
+        {"exerciseId": "squats", "sets": 3, "reps": "15-20"},
+        {"exerciseId": "plank", "sets": 3, "reps": "30 сек"}
+      ],
+      "wednesday": [
+        {"exerciseId": "pushups", "sets": 3, "reps": "10-12"},
+        {"exerciseId": "squats", "sets": 3, "reps": "15-20"},
+        {"exerciseId": "plank", "sets": 3, "reps": "30 сек"}
+      ],
+      "friday": [
+        {"exerciseId": "pushups", "sets": 3, "reps": "10-12"},
+        {"exerciseId": "squats", "sets": 3, "reps": "15-20"},
+        {"exerciseId": "plank", "sets": 3, "reps": "30 сек"}
+      ]
+    }
+  },
+  {
+    "id": "advanced_strength",
+    "name": "Для опытных: сила",
+    "description": "Сплит тренировки 4 раза в неделю",
+    "target": ["strength", "mass_gain"],
+    "level": "advanced",
+    "equipmentRequired": ["pullup_bar", "dumbbells"],
+    "weeklyPlan": {
+      "monday": [
+        {"exerciseId": "pullups", "sets": 4, "reps": "6-8"},
+        {"exerciseId": "pushups", "sets": 4, "reps": "8-10"}
+      ],
+      "tuesday": [
+        {"exerciseId": "squats", "sets": 4, "reps": "8-10"},
+        {"exerciseId": "plank", "sets": 3, "reps": "45 сек"}
+      ],
+      "thursday": [
+        {"exerciseId": "pullups", "sets": 4, "reps": "6-8"},
+        {"exerciseId": "pushups", "sets": 4, "reps": "8-10"}
+      ],
+      "friday": [
+        {"exerciseId": "squats", "sets": 4, "reps": "8-10"},
+        {"exerciseId": "plank", "sets": 3, "reps": "45 сек"}
+      ]
+    }
+  }
+]

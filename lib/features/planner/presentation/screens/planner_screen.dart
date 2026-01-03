@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:fitplan_creator/core/constants/app_colors.dart';
-import 'package:fitplan_creator/core/widgets/custom_button.dart';
+import 'package:fitplan_creator/core/widgets/custom_button.dart'; // Удалил AppColors
 
 class PlannerScreen extends StatelessWidget {
   const PlannerScreen({super.key});

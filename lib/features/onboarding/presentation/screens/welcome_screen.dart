@@ -25,7 +25,7 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 30),
               
               // Заголовок
-              Text(
+              const Text(
                 'FitPlan Creator',
                 style: TextStyle(
                   fontSize: 36,
@@ -36,22 +36,22 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 10),
               
               // Подзаголовок
-              Text(
+              const Text(
                 'Персональный план тренировок\nза 5 минут',
                 style: TextStyle(
                   fontSize: 18,
-                  color: AppColors.textColor.withOpacity(0.8),
+                  color: Color(0xFF666666), // Исправлено: вместо withOpacity(0.8)
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 50),
               
               // Описание
-              Text(
+              const Text(
                 'Создайте идеальную программу тренировок,\nоснованную на ваших целях и оборудовании',
                 style: TextStyle(
                   fontSize: 16,
-                  color: AppColors.textColor.withOpacity(0.6),
+                  color: Color(0xFF888888), // Исправлено: вместо withOpacity(0.6)
                 ),
                 textAlign: TextAlign.center,
               ),

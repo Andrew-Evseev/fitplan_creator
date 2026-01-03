@@ -1,0 +1,42 @@
+[
+  {
+    "id": "pushups",
+    "name": "Отжимания",
+    "muscleGroup": "chest",
+    "equipment": ["bodyweight"],
+    "difficulty": "beginner",
+    "gifUrl": "https://media.giphy.com/media/3o7TKr2uFhxjpVK3i8/giphy.gif",
+    "substituteIds": ["bench_press", "chest_dips"],
+    "description": "Упражнение для грудных мышц"
+  },
+  {
+    "id": "squats",
+    "name": "Приседания",
+    "muscleGroup": "legs",
+    "equipment": ["bodyweight"],
+    "difficulty": "beginner",
+    "gifUrl": "https://media.giphy.com/media/3o7TKr2uFhxjpVK3i8/giphy.gif",
+    "substituteIds": ["lunges", "leg_press"],
+    "description": "Базовое упражнение для ног"
+  },
+  {
+    "id": "pullups",
+    "name": "Подтягивания",
+    "muscleGroup": "back",
+    "equipment": ["pullup_bar"],
+    "difficulty": "intermediate",
+    "gifUrl": "https://media.giphy.com/media/3o7TKr2uFhxjpVK3i8/giphy.gif",
+    "substituteIds": ["lat_pulldown", "bent_over_rows"],
+    "description": "Упражнение для спины"
+  },
+  {
+    "id": "plank",
+    "name": "Планка",
+    "muscleGroup": "core",
+    "equipment": ["bodyweight"],
+    "difficulty": "beginner",
+    "gifUrl": "https://media.giphy.com/media/3o7TKr2uFhxjpVK3i8/giphy.gif",
+    "substituteIds": ["side_plank", "mountain_climbers"],
+    "description": "Упражнение для пресса и кора"
+  }
+]

@@ -38,7 +38,7 @@ class _LoadingScreenState extends State<LoadingScreen> {
               'Подбираем оптимальную программу...',
               style: TextStyle(
                 fontSize: 18,
-                color: AppColors.textColor.withOpacity(0.8),
+                color: AppColors.textColor.withAlpha(200), // Исправлено
               ),
             ),
           ],

@@ -20,7 +20,7 @@ class LoadingIndicator extends StatelessWidget {
             Text(
               message!,
               style: TextStyle(
-                color: AppColors.textColor.withOpacity(0.7),
+                color: AppColors.textColor.withAlpha(180), // Исправлено
                 fontSize: 16,
               ),
             ),
