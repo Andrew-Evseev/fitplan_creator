@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitplan_creator/data/models/user_preferences.dart';
 
 class QuestionnaireNotifier extends StateNotifier<UserPreferences> {
