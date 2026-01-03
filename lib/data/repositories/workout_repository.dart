@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'package:flutter/services.dart';
 import 'package:fitplan_creator/data/models/exercise.dart';
 import 'package:fitplan_creator/data/models/user_preferences.dart';
 import 'package:fitplan_creator/data/models/workout_plan.dart';
@@ -7,155 +5,133 @@ import 'package:fitplan_creator/data/models/workout_template.dart';
 import 'package:fitplan_creator/data/models/workout_exercise.dart';
 
 class WorkoutRepository {
-  Future<List<Exercise>> getAllExercises() async {
-    try {
-      // Загрузка упражнений из JSON файла
-      final data = await rootBundle.loadString('assets/data/exercises.json');
-      final List<dynamic> jsonList = json.decode(data);
-      
-      return jsonList
-          .map((json) => Exercise.fromMap(json))
-          .toList();
-    } catch (e) {
-      // Возвращаем тестовые данные, если файл не найден
-      return const [  // Добавлено const
-        Exercise(
-          id: 'pushups',
-          name: 'Отжимания',
-          muscleGroup: 'chest',
-          equipment: ['bodyweight'],
-          difficulty: 'beginner',
-          gifUrl: 'https://media.giphy.com/media/3o7TKr2uFhxjpVK3i8/giphy.gif',
-          substituteIds: ['bench_press', 'chest_dips'],
-          description: 'Упражнение для грудных мышц',
-        ),
-        Exercise(
-          id: 'squats',
-          name: 'Приседания',
-          muscleGroup: 'legs',
-          equipment: ['bodyweight'],
-          difficulty: 'beginner',
-          gifUrl: 'https://media.giphy.com/media/3o7TKr2uFhxjpVK3i8/giphy.gif',
-          substituteIds: ['lunges', 'leg_press'],
-          description: 'Базовое упражнение для ног',
-        ),
-      ];
-    }
+  List<Exercise> getAllExercises() {
+    return [
+      const Exercise(
+        id: 'pushup',
+        name: 'Отжимания',
+        description: 'Базовое упражнение для груди и трицепса',
+        instructions: 'Примите упор лежа...',
+        primaryMuscleGroup: 'chest',
+        secondaryMuscleGroups: ['triceps', 'shoulders'],
+        requiredEquipment: [],
+        difficulty: 'beginner',
+      ),
+      const Exercise(
+        id: 'squat',
+        name: 'Приседания',
+        description: 'Базовое упражнение для ног',
+        instructions: 'Встаньте прямо...',
+        primaryMuscleGroup: 'legs',
+        secondaryMuscleGroups: ['glutes', 'core'],
+        requiredEquipment: [],
+        difficulty: 'beginner',
+      ),
+      const Exercise(
+        id: 'plank',
+        name: 'Планка',
+        description: 'Упражнение для укрепления кора',
+        instructions: 'Примите положение упора лежа на предплечьях...',
+        primaryMuscleGroup: 'core',
+        secondaryMuscleGroups: ['shoulders', 'back'],
+        requiredEquipment: [],
+        difficulty: 'beginner',
+      ),
+      const Exercise(
+        id: 'dumbbell_curl',
+        name: 'Сгибания рук с гантелями',
+        description: 'Упражнение для бицепса',
+        instructions: 'Возьмите гантели в обе руки...',
+        primaryMuscleGroup: 'biceps',
+        secondaryMuscleGroups: ['forearms'],
+        requiredEquipment: ['dumbbells'],
+        difficulty: 'beginner',
+      ),
+      const Exercise(
+        id: 'dumbbell_press',
+        name: 'Жим гантелей',
+        description: 'Упражнение для груди и плеч',
+        instructions: 'Лягте на скамью...',
+        primaryMuscleGroup: 'chest',
+        secondaryMuscleGroups: ['shoulders', 'triceps'],
+        requiredEquipment: ['dumbbells', 'bench'],
+        difficulty: 'intermediate',
+      ),
+    ];
   }
 
-  Future<List<WorkoutTemplate>> getAllTemplates() async {
-    try {
-      // Загрузка шаблонов из JSON файла
-      final data = await rootBundle.loadString('assets/data/templates.json');
-      final List<dynamic> jsonList = json.decode(data);
-      
-      return jsonList
-          .map((json) => WorkoutTemplate.fromMap(json))
-          .toList();
-    } catch (e) {
-      // Возвращаем тестовые шаблоны, если файл не найден
-      return const [  // Добавлено const
-        WorkoutTemplate(
-          id: 'beginner_weight_loss',
-          name: 'Для начинающих: похудение',
-          description: 'Круговые тренировки 3 раза в неделю',
-          target: ['weight_loss', 'tone'],
-          level: 'beginner',
-          equipmentRequired: ['bodyweight'],
-          weeklyPlan: {
-            'monday': [
-              WorkoutExercise(exerciseId: 'pushups', sets: 3, reps: '10-12'),
-              WorkoutExercise(exerciseId: 'squats', sets: 3, reps: '15-20'),
-            ],
-            'wednesday': [
-              WorkoutExercise(exerciseId: 'pushups', sets: 3, reps: '10-12'),
-              WorkoutExercise(exerciseId: 'squats', sets: 3, reps: '15-20'),
-            ],
-            'friday': [
-              WorkoutExercise(exerciseId: 'pushups', sets: 3, reps: '10-12'),
-              WorkoutExercise(exerciseId: 'squats', sets: 3, reps: '15-20'),
-            ],
-          },
-        ),
-      ];
-    }
-  }
+  WorkoutPlan getWorkoutPlan({UserPreferences? preferences}) {
+    // Создаем упражнения для тренировок
+    final day1Exercises = [
+      WorkoutExercise(exerciseId: 'pushup', sets: 3, reps: 10),
+      WorkoutExercise(exerciseId: 'plank', sets: 3, reps: 30),
+    ];
+    
+    final day2Exercises = [
+      WorkoutExercise(exerciseId: 'squat', sets: 3, reps: 12),
+      WorkoutExercise(exerciseId: 'plank', sets: 3, reps: 30),
+    ];
 
-  Future<WorkoutTemplate> getTemplateForUser(UserPreferences preferences) async {
-    final templates = await getAllTemplates();
-    
-    // Простой алгоритм подбора шаблона
-    for (final template in templates) {
-      if (_matchesPreferences(template, preferences)) {
-        return template;
-      }
-    }
-    
-    // Если не нашли подходящий, возвращаем первый шаблон для новичков
-    return templates.firstWhere(
-      (template) => template.level == 'beginner',
-      orElse: () => templates.first,
-    );
-  }
+    // Создаем тренировки
+    final workouts = [
+      Workout(
+        id: 'day1',
+        name: 'День 1: Верх тела',
+        dayOfWeek: 1,
+        exercises: day1Exercises,
+        duration: 45,
+        completed: false,
+      ),
+      Workout(
+        id: 'day2',
+        name: 'День 2: Низ тела',
+        dayOfWeek: 2,
+        exercises: day2Exercises,
+        duration: 45,
+        completed: false,
+      ),
+    ];
 
-  bool _matchesPreferences(WorkoutTemplate template, UserPreferences preferences) {
-    // Проверка цели
-    if (!template.target.contains(preferences.goal)) {
-      return false;
-    }
-    
-    // Проверка уровня
-    if (template.level != preferences.level) {
-      return false;
-    }
-    
-    // Проверка оборудования
-    for (final equipment in template.equipmentRequired) {
-      if (!preferences.equipment.contains(equipment)) {
-        return false;
-      }
-    }
-    
-    return true;
-  }
-
-  Future<List<Exercise>> getExerciseSubstitutes(String exerciseId, UserPreferences preferences) async {
-    final allExercises = await getAllExercises();
-    final targetExercise = allExercises.firstWhere(
-      (e) => e.id == exerciseId,
-      orElse: () => allExercises.first,
-    );
-    
-    // Фильтруем упражнения по группе мышц и оборудованию
-    return allExercises.where((exercise) {
-      if (exercise.id == exerciseId) return false;
-      
-      // Та же группа мышц
-      if (exercise.muscleGroup != targetExercise.muscleGroup) return false;
-      
-      // Доступное оборудование
-      for (final equipment in exercise.equipment) {
-        if (!preferences.equipment.contains(equipment)) {
-          return false;
-        }
-      }
-      
-      return true;
-    }).toList();
-  }
-
-  Future<WorkoutPlan> createUserPlan({
-    required String userId,
-    required UserPreferences preferences,
-  }) async {
-    final template = await getTemplateForUser(preferences);
-    
     return WorkoutPlan(
-      id: 'plan_${DateTime.now().millisecondsSinceEpoch}',
-      userId: userId,
-      templateId: template.id,
-      weeklyPlan: template.weeklyPlan,
+      id: 'default',
+      userId: 'default',
+      name: preferences?.goal != null ? 'План для ${preferences!.goal!.displayName}' : 'План тренировок',
+      description: 'Персональный план',
+      workouts: workouts,
       createdAt: DateTime.now(),
+      userPreferences: preferences,
     );
+  }
+
+  List<WorkoutTemplate> getWorkoutTemplates() {
+    final fullbodyExercises = [
+      WorkoutExercise(exerciseId: 'squat', sets: 3, reps: 10),
+      WorkoutExercise(exerciseId: 'pushup', sets: 3, reps: 12),
+      WorkoutExercise(exerciseId: 'plank', sets: 3, reps: 30),
+    ];
+    
+    final cardioExercises = [
+      WorkoutExercise(exerciseId: 'pushup', sets: 3, reps: 15),
+      WorkoutExercise(exerciseId: 'plank', sets: 4, reps: 45),
+    ];
+
+    return [
+      WorkoutTemplate(
+        id: 'fullbody',
+        name: 'Фулбади',
+        description: 'Тренировка на все тело',
+        exercises: fullbodyExercises,
+        duration: 60,
+        difficulty: 'beginner',
+      ),
+      WorkoutTemplate(
+        id: 'cardio',
+        name: 'Кардио',
+        description: 'Тренировка для выносливости',
+        exercises: cardioExercises,
+        duration: 30,
+        difficulty: 'beginner',
+      ),
+    ];
   }
 }

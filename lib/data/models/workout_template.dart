@@ -4,60 +4,40 @@ class WorkoutTemplate {
   final String id;
   final String name;
   final String description;
-  final List<String> target;
-  final String level;
-  final List<String> equipmentRequired;
-  final Map<String, List<WorkoutExercise>> weeklyPlan;
+  final List<WorkoutExercise> exercises;
+  final int duration; // в минутах
+  final String difficulty;
 
   const WorkoutTemplate({
     required this.id,
     required this.name,
     required this.description,
-    required this.target,
-    required this.level,
-    required this.equipmentRequired,
-    required this.weeklyPlan,
+    required this.exercises,
+    required this.duration,
+    required this.difficulty,
   });
 
-  factory WorkoutTemplate.fromMap(Map<String, dynamic> map) {
-    final weeklyPlan = <String, List<WorkoutExercise>>{};
-    
-    if (map['weeklyPlan'] != null) {
-      final planMap = Map<String, dynamic>.from(map['weeklyPlan']);
-      for (final entry in planMap.entries) {
-        final exercises = (entry.value as List)
-            .map((e) => WorkoutExercise.fromMap(e))
-            .toList();
-        weeklyPlan[entry.key] = exercises;
-      }
-    }
-
-    return WorkoutTemplate(
-      id: map['id'] ?? '',
-      name: map['name'] ?? '',
-      description: map['description'] ?? '',
-      target: List<String>.from(map['target'] ?? []),
-      level: map['level'] ?? 'beginner',
-      equipmentRequired: List<String>.from(map['equipmentRequired'] ?? []),
-      weeklyPlan: weeklyPlan,
-    );
-  }
-
-  Map<String, dynamic> toMap() {
-    final weeklyPlanMap = <String, List<Map<String, dynamic>>>{};
-    
-    for (final entry in weeklyPlan.entries) {
-      weeklyPlanMap[entry.key] = entry.value.map((e) => e.toMap()).toList();
-    }
-
+  Map<String, dynamic> toJson() {
     return {
       'id': id,
       'name': name,
       'description': description,
-      'target': target,
-      'level': level,
-      'equipmentRequired': equipmentRequired,
-      'weeklyPlan': weeklyPlanMap,
+      'exercises': exercises.map((e) => e.toJson()).toList(),
+      'duration': duration,
+      'difficulty': difficulty,
     };
+  }
+
+  factory WorkoutTemplate.fromJson(Map<String, dynamic> json) {
+    return WorkoutTemplate(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      description: json['description'] as String,
+      exercises: (json['exercises'] as List)
+          .map((e) => WorkoutExercise.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      duration: json['duration'] as int,
+      difficulty: json['difficulty'] as String,
+    );
   }
 }
