@@ -63,7 +63,7 @@ class WelcomeScreen extends StatelessWidget {
                 onPressed: () {
                   context.push('/questionnaire');
                 },
-                isFullWidth: true,
+                fullWidth: true,
               ),
             ],
           ),
