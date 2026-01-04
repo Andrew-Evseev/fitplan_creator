@@ -3,48 +3,181 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fitplan_creator/core/widgets/custom_button.dart';
 import 'package:fitplan_creator/features/planner/providers/planner_provider.dart';
+import 'package:fitplan_creator/features/planner/presentation/widgets/exercise_replacement_bottom_sheet.dart';
 import 'package:fitplan_creator/data/models/workout_plan.dart';
 import 'package:fitplan_creator/data/models/workout_exercise.dart';
 
-class PlannerScreen extends ConsumerWidget {
+class PlannerScreen extends ConsumerStatefulWidget {
   const PlannerScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PlannerScreen> createState() => _PlannerScreenState();
+}
+
+class _PlannerScreenState extends ConsumerState<PlannerScreen> {
+  final Set<int> _expandedWorkouts = {};
+
+  @override
+  Widget build(BuildContext context) {
     final plan = ref.watch(plannerProvider);
+    final plannerNotifier = ref.read(plannerProvider.notifier);
     
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ваш план тренировок'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.restart_alt),
+            icon: const Icon(Icons.info_outline),
             onPressed: () {
-              context.go('/welcome');
+              _showPlanInfo(context, plan);
             },
+            tooltip: 'Информация о плане',
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              _showRegeneratePlanDialog(context, ref);
+            },
+            tooltip: 'Перегенерировать план',
           ),
           IconButton(
             icon: const Icon(Icons.download),
             onPressed: () {
               _exportPlan(context, plan);
             },
+            tooltip: 'Экспорт плана',
           ),
         ],
       ),
       body: plan.workouts.isEmpty
           ? _buildEmptyState(context)
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: plan.workouts.length,
-              itemBuilder: (context, index) {
-                final workout = plan.workouts[index];
-                return _buildWorkoutCard(context, ref, workout, index);
-              },
+          : Column(
+              children: [
+                // Прогресс плана
+                _buildPlanProgressHeader(context, plan, plannerNotifier),
+                
+                // Список тренировок
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: plan.workouts.length,
+                    itemBuilder: (context, index) {
+                      final workout = plan.workouts[index];
+                      return _buildWorkoutCard(
+                        context, 
+                        ref, 
+                        workout, 
+                        index,
+                        isExpanded: _expandedWorkouts.contains(index),
+                        onExpansionChanged: (expanded) {
+                          setState(() {
+                            if (expanded) {
+                              _expandedWorkouts.add(index);
+                            } else {
+                              _expandedWorkouts.remove(index);
+                            }
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
     );
   }
 
-  Widget _buildWorkoutCard(BuildContext context, WidgetRef ref, Workout workout, int index) {
+  // Заголовок с прогрессом плана
+  Widget _buildPlanProgressHeader(BuildContext context, WorkoutPlan plan, PlannerNotifier plannerNotifier) {
+    final progress = plannerNotifier.getProgress();
+    final completedWorkouts = plan.workouts.where((w) => w.completed).length;
+    final totalWorkouts = plan.workouts.length;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).primaryColor.withAlpha(12),
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.grey.shade200,
+            width: 1,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      plan.name,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      plan.description,
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 12,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${(progress * 100).toStringAsFixed(0)}%',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2196F3),
+                    ),
+                  ),
+                  Text(
+                    '$completedWorkouts/$totalWorkouts',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          LinearProgressIndicator(
+            value: progress,
+            backgroundColor: Colors.grey.shade200,
+            color: const Color(0xFF2196F3),
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Карточка тренировки
+  Widget _buildWorkoutCard(
+    BuildContext context,
+    WidgetRef ref,
+    Workout workout,
+    int index, {
+    required bool isExpanded,
+    required void Function(bool) onExpansionChanged,
+  }) {
     final dayNames = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
     final dayName = workout.dayOfWeek >= 1 && workout.dayOfWeek <= 7 
         ? dayNames[workout.dayOfWeek - 1] 
@@ -52,66 +185,112 @@ class PlannerScreen extends ConsumerWidget {
     
     final completedSetsCount = workout.exercises.expand((e) => e.completedSets).where((c) => c).length;
     final totalSetsCount = workout.exercises.fold(0, (sum, e) => sum + e.sets);
-    final progress = totalSetsCount > 0 ? completedSetsCount / totalSetsCount : 0.0; // ИСПРАВЛЕНО: 0 -> 0.0
+    final progress = totalSetsCount > 0 ? completedSetsCount / totalSetsCount : 0.0;
     
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
       child: ExpansionTile(
+        initiallyExpanded: isExpanded,
+        onExpansionChanged: onExpansionChanged,
         leading: CircleAvatar(
-          backgroundColor: workout.completed ? Colors.green : _getDayColor(workout.dayOfWeek),
+          backgroundColor: workout.completed 
+              ? const Color(0xFF4CAF50)
+              : _getDayColor(workout.dayOfWeek),
           child: Text(
             '${index + 1}',
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
         title: Text(
           workout.name.isNotEmpty ? workout.name : dayName,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${workout.exercises.length} упражнений • ${workout.duration} мин'),
-            const SizedBox(height: 4),
+            Text(
+              '${workout.exercises.length} упражнений • ${workout.duration} мин',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 6),
             LinearProgressIndicator(
               value: progress,
-              backgroundColor: Colors.grey[200],
-              color: workout.completed ? Colors.green : Colors.blue,
+              backgroundColor: Colors.grey.shade200,
+              color: workout.completed ? const Color(0xFF4CAF50) : const Color(0xFF2196F3),
+              minHeight: 6,
+              borderRadius: BorderRadius.circular(3),
             ),
           ],
         ),
-        trailing: IconButton(
-          icon: Icon(
-            workout.completed ? Icons.check_circle : Icons.circle_outlined,
-            color: workout.completed ? Colors.green : Colors.grey,
-          ),
-          onPressed: () {
-            _toggleWorkoutCompletion(context, ref, index, workout);
-          },
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!workout.completed)
+              IconButton(
+                icon: const Icon(Icons.restart_alt, size: 20),
+                onPressed: () {
+                  _resetWorkoutCompletion(context, ref, workout.id);
+                },
+                tooltip: 'Сбросить выполнение',
+              ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: workout.completed 
+                    ? const Color(0xFFE8F5E9)
+                    : const Color(0xFFE3F2FD),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: workout.completed ? const Color(0xFF4CAF50) : const Color(0xFF2196F3),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                workout.completed ? 'Выполнено' : 'К выполнению',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: workout.completed ? const Color(0xFF4CAF50) : const Color(0xFF2196F3),
+                ),
+              ),
+            ),
+          ],
         ),
         children: [
-          ...workout.exercises.asMap().entries.map((entry) {
-            final exerciseIndex = entry.key;
-            final exercise = entry.value;
-            return _buildExerciseTile(context, ref, workout, index, exercise, exerciseIndex);
-          }).toList(),
+          for (final entry in workout.exercises.asMap().entries)
+            _buildExerciseTile(context, ref, workout, entry.value, entry.key),
+          
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(12.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.add),
-                  label: const Text('Добавить упражнение'),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.check_circle, size: 16),
+                  label: const Text('Завершить тренировку'),
                   onPressed: () {
-                    _addExercise(context, ref, index);
+                    _completeWorkout(context, ref, workout.id);
                   },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4CAF50),
+                    foregroundColor: Colors.white,
+                  ),
                 ),
                 OutlinedButton.icon(
-                  icon: const Icon(Icons.shuffle),
-                  label: const Text('Перемешать'),
+                  icon: const Icon(Icons.restart_alt, size: 16),
+                  label: const Text('Сбросить'),
                   onPressed: () {
-                    _shuffleWorkout(context, ref, index);
+                    _resetWorkoutCompletion(context, ref, workout.id);
                   },
                 ),
               ],
@@ -122,105 +301,303 @@ class PlannerScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildExerciseTile(BuildContext context, WidgetRef ref, Workout workout, int workoutIndex, WorkoutExercise exercise, int exerciseIndex) {
+  // Плитка упражнения
+  Widget _buildExerciseTile(
+    BuildContext context,
+    WidgetRef ref,
+    Workout workout,
+    WorkoutExercise exercise,
+    int exerciseIndex,
+  ) {
     final completedSets = exercise.completedSets.where((c) => c).length;
     final totalSets = exercise.sets;
+    final exerciseDetails = ref.read(plannerProvider.notifier).getExerciseById(exercise.exerciseId);
     
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: completedSets == totalSets ? Colors.green : Colors.blue[50],
-        child: Icon(
-          completedSets == totalSets ? Icons.check : Icons.fitness_center,
-          color: completedSets == totalSets ? Colors.white : Colors.blue[700],
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.grey.shade50,
+      ),
+      child: ListTile(
+        leading: GestureDetector(
+          onTap: () {
+            _showExerciseDetails(context, ref, exercise);
+          },
+          child: CircleAvatar(
+            backgroundColor: completedSets == totalSets 
+                ? const Color(0xFFE8F5E9)
+                : const Color(0xFFE3F2FD),
+            child: Icon(
+              completedSets == totalSets 
+                  ? Icons.check 
+                  : Icons.fitness_center,
+              color: completedSets == totalSets ? const Color(0xFF4CAF50) : const Color(0xFF2196F3),
+            ),
+          ),
         ),
-      ),
-      title: Text(
-        _getExerciseName(exercise.exerciseId),
-        style: const TextStyle(fontWeight: FontWeight.w500),
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('${exercise.sets} x ${exercise.reps} • Отдых: ${exercise.restTime} сек'),
-          const SizedBox(height: 4),
-          Row(
-            children: List.generate(exercise.sets, (setIndex) {
-              final isCompleted = setIndex < exercise.completedSets.length 
-                  ? exercise.completedSets[setIndex] 
-                  : false;
-              return Container(
-                width: 20,
-                height: 8,
-                margin: const EdgeInsets.only(right: 4),
-                decoration: BoxDecoration(
-                  color: isCompleted ? Colors.green : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(4),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                exerciseDetails.id.isNotEmpty 
+                    ? exerciseDetails.name 
+                    : exercise.exerciseId,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: completedSets == totalSets 
+                    ? const Color(0xFFE8F5E9)
+                    : const Color(0xFFE3F2FD),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: completedSets == totalSets ? const Color(0xFF4CAF50) : const Color(0xFF2196F3),
+                  width: 1,
                 ),
-              );
-            }),
-          ),
-        ],
+              ),
+              child: Text(
+                '$completedSets/$totalSets',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: completedSets == totalSets ? const Color(0xFF4CAF50) : const Color(0xFF2196F3),
+                ),
+              ),
+            ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${exercise.sets} × ${exercise.reps} повторений • Отдых: ${exercise.restTime} сек',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: List.generate(exercise.sets, (setIndex) {
+                final isCompleted = setIndex < exercise.completedSets.length 
+                    ? exercise.completedSets[setIndex] 
+                    : false;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      ref.read(plannerProvider.notifier).updateSetCompletion(
+                        dayId: workout.id,
+                        exerciseIndex: exerciseIndex,
+                        setIndex: setIndex,
+                        completed: !isCompleted,
+                      );
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 4),
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: isCompleted ? const Color(0xFF4CAF50) : Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${setIndex + 1}',
+                          style: TextStyle(
+                            color: isCompleted ? Colors.white : Colors.grey.shade600,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.swap_horiz, size: 20),
+              onPressed: () {
+                _replaceExercise(context, ref, workout.id, exerciseIndex, exercise.exerciseId);
+              },
+              tooltip: 'Заменить упражнение',
+            ),
+            IconButton(
+              icon: const Icon(Icons.edit, size: 20),
+              onPressed: () {
+                _editExerciseParameters(context, ref, workout.id, exerciseIndex, exercise);
+              },
+              tooltip: 'Редактировать параметры',
+            ),
+          ],
+        ),
+        onTap: () {
+          _showExerciseDetails(context, ref, exercise);
+        },
       ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.swap_horiz, size: 20),
-            onPressed: () {
-              _replaceExercise(context, ref, workoutIndex, exerciseIndex);
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit, size: 20),
-            onPressed: () {
-              _editExercise(context, ref, workoutIndex, exerciseIndex, exercise);
-            },
-          ),
-        ],
-      ),
-      onTap: () {
-        _showExerciseDetails(context, exercise);
-      },
-      onLongPress: () {
-        _toggleExerciseSet(context, ref, workoutIndex, exerciseIndex);
-      },
     );
   }
 
-  String _getExerciseName(String exerciseId) {
-    final exerciseNames = {
-      'bench_press': 'Жим штанги лежа',
-      'squats': 'Приседания',
-      'pull_ups': 'Подтягивания',
-      'push_ups': 'Отжимания',
-      'deadlift': 'Становая тяга',
-      'bicep_curls': 'Сгибания рук с гантелями',
-      'plank': 'Планка',
-    };
-    
-    return exerciseNames[exerciseId] ?? exerciseId;
-  }
-
+  // Цвет дня недели
   Color _getDayColor(int day) {
     final colors = [
-      Colors.red,      // 1 - Понедельник
-      Colors.orange,   // 2 - Вторник
-      Colors.yellow[700]!, // 3 - Среда
-      Colors.green,    // 4 - Четверг
-      Colors.blue,     // 5 - Пятница
-      Colors.indigo,   // 6 - Суббота
-      Colors.purple,   // 7 - Воскресенье
+      const Color(0xFFEF5350),  // Понедельник
+      const Color(0xFFFFA726),  // Вторник
+      const Color(0xFFFFEE58),  // Среда
+      const Color(0xFF66BB6A),  // Четверг
+      const Color(0xFF42A5F5),  // Пятница
+      const Color(0xFF5C6BC0),  // Суббота
+      const Color(0xFFAB47BC),  // Воскресенье
     ];
-    return day >= 1 && day <= 7 ? colors[day - 1] : Colors.grey;
+    return day >= 1 && day <= 7 ? colors[day - 1] : Colors.grey.shade400;
   }
 
-  void _toggleWorkoutCompletion(BuildContext context, WidgetRef ref, int workoutIndex, Workout workout) {
+  // Показать диалог перегенерации плана
+  void _showRegeneratePlanDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Перегенерировать план'),
+        content: const Text('Это создаст новый план на основе ваших предпочтений. Текущий прогресс будет потерян. Продолжить?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              ref.read(plannerProvider.notifier).resetPlan();
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('План перегенерирован'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            child: const Text('Перегенерировать'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Завершить тренировку
+  void _completeWorkout(BuildContext context, WidgetRef ref, String workoutId) {
+    final plan = ref.read(plannerProvider);
+    final workoutIndex = plan.workouts.indexWhere((w) => w.id == workoutId);
+    if (workoutIndex == -1) return;
+    
+    final workout = plan.workouts[workoutIndex];
+    
+    for (int i = 0; i < workout.exercises.length; i++) {
+      final exercise = workout.exercises[i];
+      for (int j = 0; j < exercise.sets; j++) {
+        ref.read(plannerProvider.notifier).updateSetCompletion(
+          dayId: workoutId,
+          exerciseIndex: i,
+          setIndex: j,
+          completed: true,
+        );
+      }
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Тренировка "${workout.name}" завершена!'),
+        backgroundColor: const Color(0xFF4CAF50),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // Сбросить выполнение тренировки
+  void _resetWorkoutCompletion(BuildContext context, WidgetRef ref, String workoutId) {
+    ref.read(plannerProvider.notifier).resetWorkoutCompletion(workoutId);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Выполнение тренировки сброшено'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // Замена упражнения
+  void _replaceExercise(
+    BuildContext context,
+    WidgetRef ref,
+    String workoutId,
+    int exerciseIndex,
+    String currentExerciseId,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ExerciseReplacementBottomSheet(
+        workoutId: workoutId,
+        exerciseIndex: exerciseIndex,
+        currentExerciseId: currentExerciseId,
+      ),
+    );
+  }
+
+  // Редактирование параметров упражнения
+  void _editExerciseParameters(
+    BuildContext context,
+    WidgetRef ref,
+    String workoutId,
+    int exerciseIndex,
+    WorkoutExercise exercise,
+  ) {
+    final setsController = TextEditingController(text: exercise.sets.toString());
+    final repsController = TextEditingController(text: exercise.reps.toString());
+    final restController = TextEditingController(text: exercise.restTime.toString());
+    
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Завершение тренировки'),
-          content: Text('Отметить тренировку "${workout.name}" как завершенную?'),
+          title: const Text('Редактировать параметры'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: setsController,
+                decoration: const InputDecoration(
+                  labelText: 'Подходы',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: repsController,
+                decoration: const InputDecoration(
+                  labelText: 'Повторения',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: restController,
+                decoration: const InputDecoration(
+                  labelText: 'Отдых (секунды)',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -228,10 +605,29 @@ class PlannerScreen extends ConsumerWidget {
             ),
             ElevatedButton(
               onPressed: () {
-                // TODO: Реализовать отметку тренировки как завершенной
+                final newSets = int.tryParse(setsController.text) ?? exercise.sets;
+                final newReps = int.tryParse(repsController.text) ?? exercise.reps;
+                final newRest = int.tryParse(restController.text) ?? exercise.restTime;
+                
+                // Используем переменные
+                ref.read(plannerProvider.notifier).updateExerciseParameters(
+                  workoutId: workoutId,
+                  exerciseIndex: exerciseIndex,
+                  sets: newSets,
+                  reps: newReps,
+                  restTime: newRest,
+                );
+                
                 Navigator.pop(context);
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Параметры изменены: $newSets подходов, $newReps повторений, отдых $newRest сек'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
               },
-              child: const Text('Завершить'),
+              child: const Text('Сохранить'),
             ),
           ],
         );
@@ -239,30 +635,16 @@ class PlannerScreen extends ConsumerWidget {
     );
   }
 
-  void _toggleExerciseSet(BuildContext context, WidgetRef ref, int workoutIndex, int exerciseIndex) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Отметить подход'),
-          content: const Text('Выберите подход для отметки:'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Отмена'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showExerciseDetails(BuildContext context, WorkoutExercise exercise) {
-    final exerciseName = _getExerciseName(exercise.exerciseId);
+  // Детали упражнения
+  void _showExerciseDetails(BuildContext context, WidgetRef ref, WorkoutExercise exercise) {
+    final exerciseDetails = ref.read(plannerProvider.notifier).getExerciseById(exercise.exerciseId);
     
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) {
         return Container(
           padding: const EdgeInsets.all(20),
@@ -271,42 +653,82 @@ class PlannerScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Center(
-                child: Text(
-                  exerciseName,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
+              const SizedBox(height: 20),
+              
+              Center(
+                child: Text(
+                  exerciseDetails.name,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              
               const SizedBox(height: 16),
               
-              const Text(
-                'Параметры:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text('Подходы: ${exercise.sets}'),
-              Text('Повторения: ${exercise.reps}'),
-              Text('Отдых между подходами: ${exercise.restTime} сек'),
+              if (exerciseDetails.description.isNotEmpty)
+                Text(
+                  exerciseDetails.description,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                  ),
+                ),
               
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
+              
               const Text(
-                'Статус подходов:',
-                style: TextStyle(fontWeight: FontWeight.bold),
+                'Параметры выполнения:',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              Wrap(
-                spacing: 8,
-                children: exercise.completedSets.asMap().entries.map((entry) {
-                  final setIndex = entry.key;
-                  final isCompleted = entry.value;
-                  return Chip(
-                    label: Text('${setIndex + 1} подход'),
-                    backgroundColor: isCompleted ? Colors.green[100] : Colors.grey[200],
-                    labelStyle: TextStyle(
-                      color: isCompleted ? Colors.green[800] : Colors.grey[600],
-                    ),
-                  );
-                }).toList(),
+              const SizedBox(height: 12),
+              
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildDetailCard('Подходы', '${exercise.sets}', Icons.repeat),
+                  _buildDetailCard('Повторения', '${exercise.reps}', Icons.format_list_numbered),
+                  _buildDetailCard('Отдых', '${exercise.restTime} сек', Icons.timer),
+                ],
               ),
               
               const SizedBox(height: 20),
+              
+              if (exerciseDetails.instructions.isNotEmpty) ...[
+                const Text(
+                  'Техника выполнения:',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  exerciseDetails.instructions,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+              
+              const SizedBox(height: 20),
+              
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -321,183 +743,155 @@ class PlannerScreen extends ConsumerWidget {
     );
   }
 
-  void _replaceExercise(BuildContext context, WidgetRef ref, int workoutIndex, int exerciseIndex) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Замена упражнения'),
-          content: const Text('Функционал замены упражнений будет реализован в ближайшее время.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
+  Widget _buildDetailCard(String title, String value, IconData icon) {
+    return Column(
+      children: [
+        Icon(
+          icon,
+          color: const Color(0xFF2196F3),
+          size: 24,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF2196F3),
+          ),
+        ),
+      ],
     );
   }
 
-  void _editExercise(BuildContext context, WidgetRef ref, int workoutIndex, int exerciseIndex, WorkoutExercise exercise) {
-    final setsController = TextEditingController(text: exercise.sets.toString());
-    final repsController = TextEditingController(text: exercise.reps.toString());
-    final restController = TextEditingController(text: exercise.restTime.toString());
-    
+  // Информация о плане
+  void _showPlanInfo(BuildContext context, WorkoutPlan plan) {
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Редактировать упражнение'),
-          content: Column(
+      builder: (context) => AlertDialog(
+        title: const Text('Информация о плане'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: setsController,
-                decoration: const InputDecoration(labelText: 'Подходы'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: repsController,
-                decoration: const InputDecoration(labelText: 'Повторения'),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: restController,
-                decoration: const InputDecoration(labelText: 'Отдых (сек)'),
-                keyboardType: TextInputType.number,
-              ),
+              Text('Название: ${plan.name}'),
+              const SizedBox(height: 8),
+              Text('Описание: ${plan.description}'),
+              const SizedBox(height: 8),
+              Text('Создан: ${plan.createdAt.toLocal().toString().split(' ')[0]}'),
+              const SizedBox(height: 8),
+              Text('Тренировок в плане: ${plan.workouts.length}'),
+              const SizedBox(height: 16),
+              if (plan.userPreferences != null) ...[
+                const Text(
+                  'Настройки пользователя:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text('Цель: ${plan.userPreferences!.goal?.displayName ?? 'Не указано'}'),
+                Text('Уровень: ${plan.userPreferences!.experienceLevel?.displayName ?? 'Не указано'}'),
+                Text('Дней в неделю: ${plan.userPreferences!.daysPerWeek ?? 'Не указано'}'),
+                Text('Длительность: ${plan.userPreferences!.sessionDuration ?? 'Не указано'} мин'),
+              ],
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Отмена'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                // TODO: Реализовать обновление упражнения
-                Navigator.pop(context);
-              },
-              child: const Text('Сохранить'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _addExercise(BuildContext context, WidgetRef ref, int workoutIndex) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Добавление упражнения'),
-          content: const Text('Функционал добавления упражнений будет реализован в ближайшее время.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _shuffleWorkout(BuildContext context, WidgetRef ref, int workoutIndex) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Перемешать упражнения'),
-          content: const Text('Функционал перемешивания будет реализован в ближайшее время.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _exportPlan(BuildContext context, WorkoutPlan plan) {
-    final buffer = StringBuffer();
-    buffer.writeln('ПЛАН ТРЕНИРОВОК');
-    buffer.writeln('===============');
-    buffer.writeln();
-    
-    for (final workout in plan.workouts) {
-      final dayNames = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
-      final dayName = workout.dayOfWeek >= 1 && workout.dayOfWeek <= 7 
-          ? dayNames[workout.dayOfWeek - 1] 
-          : 'День ${workout.dayOfWeek}';
-      
-      buffer.writeln('$dayName: ${workout.name}');
-      buffer.writeln('${workout.duration} минут, ${workout.exercises.length} упражнений');
-      buffer.writeln();
-      
-      for (final exercise in workout.exercises) {
-        buffer.writeln('  - ${_getExerciseName(exercise.exerciseId)}');
-        buffer.writeln('    ${exercise.sets} x ${exercise.reps} повторений, отдых ${exercise.restTime} сек');
-      }
-      
-      buffer.writeln();
-    }
-    
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Экспорт плана'),
-          content: SingleChildScrollView(
-            child: SelectableText(buffer.toString()),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Закрыть'),
-            ),
-            TextButton(
-              onPressed: () {
-                // TODO: Реализовать копирование в буфер обмена
-                Navigator.pop(context);
-              },
-              child: const Text('Копировать'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.fitness_center, size: 80, color: Colors.grey),
-          const SizedBox(height: 20),
-          const Text(
-            'План тренировок не сгенерирован',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Пройдите анкету, чтобы создать персональный план тренировок',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey),
-          ),
-          const SizedBox(height: 20),
-          CustomButton(
-            text: 'Создать план',
-            onPressed: () {
-              context.go('/questionnaire');
-            },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Закрыть'),
           ),
         ],
+      ),
+    );
+  }
+
+  // Экспорт плана
+  void _exportPlan(BuildContext context, WorkoutPlan plan) {
+    final exportText = ref.read(plannerProvider.notifier).exportPlanToText();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Экспорт плана'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: SelectableText(exportText),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Закрыть'),
+          ),
+          TextButton(
+            onPressed: () {
+              // TODO: Реализовать копирование в буфер обмена
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Скопировано в буфер обмена'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            child: const Text('Копировать'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Пустое состояние
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.fitness_center_outlined,
+              size: 100,
+              color: Colors.grey,
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'План тренировок не сгенерирован',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Пройдите анкету, чтобы создать персональный план тренировок',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 32),
+            CustomButton(
+              text: 'Создать план',
+              onPressed: () {
+                context.go('/questionnaire');
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

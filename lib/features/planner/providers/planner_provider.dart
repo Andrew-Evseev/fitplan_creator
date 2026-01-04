@@ -10,7 +10,8 @@ import 'package:fitplan_creator/data/repositories/workout_repository.dart';
 
 class PlannerNotifier extends StateNotifier<WorkoutPlan> {
   PlannerNotifier(this.workoutRepository)
-      : super(WorkoutPlan(
+      : _allExercises = workoutRepository.getAllExercises(),
+        super(WorkoutPlan(
           id: 'temp',
           userId: 'temp',
           name: 'Мой план тренировок',
@@ -23,11 +24,10 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
   }
 
   final WorkoutRepository workoutRepository;
-  late List<Exercise> _allExercises;
+  final List<Exercise> _allExercises;
 
   Future<void> _initialize() async {
     try {
-      _allExercises = workoutRepository.getAllExercises();
       // Если нет предпочтений пользователя, создаем план по умолчанию
       if (state.userPreferences == null) {
         await _generateDefaultPlan();
@@ -50,13 +50,50 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
   // Генерация плана по умолчанию
   Future<void> _generateDefaultPlan() async {
     try {
-      final defaultPlan = workoutRepository.getWorkoutPlan();
-      state = defaultPlan.copyWith(
+      // Используем реальные упражнения для дефолтного плана
+      final day1Exercises = [
+        WorkoutExercise(exerciseId: 'pushup', sets: 3, reps: 10),
+        WorkoutExercise(exerciseId: 'squat', sets: 3, reps: 12),
+        WorkoutExercise(exerciseId: 'plank', sets: 3, reps: 30),
+      ];
+      
+      final day2Exercises = [
+        WorkoutExercise(exerciseId: 'pull_up', sets: 3, reps: 8),
+        WorkoutExercise(exerciseId: 'bicep_curl', sets: 3, reps: 12),
+        WorkoutExercise(exerciseId: 'plank', sets: 3, reps: 30),
+      ];
+
+      final workouts = [
+        Workout(
+          id: 'day1',
+          name: 'День 1: Верх тела + Ноги',
+          dayOfWeek: 1,
+          exercises: day1Exercises,
+          duration: 45,
+          completed: false,
+        ),
+        Workout(
+          id: 'day2',
+          name: 'День 2: Спина + Руки',
+          dayOfWeek: 3,
+          exercises: day2Exercises,
+          duration: 45,
+          completed: false,
+        ),
+      ];
+
+      state = WorkoutPlan(
+        id: 'default_plan',
+        userId: 'default_user',
+        name: 'Стандартный план',
+        description: 'Базовый план для новичков',
+        workouts: workouts,
+        createdAt: DateTime.now(),
         userPreferences: UserPreferences(
           goal: UserGoal.generalFitness,
           experienceLevel: ExperienceLevel.beginner,
           availableEquipment: [Equipment.none],
-          daysPerWeek: 3,
+          daysPerWeek: 2,
           sessionDuration: 45,
         ),
       );
@@ -213,7 +250,106 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
     return adaptedExercises;
   }
 
-  // Получение альтернативных упражнений
+  // ============ НОВЫЕ ПУБЛИЧНЫЕ МЕТОДЫ ============
+
+  // Получить упражнение по ID
+  Exercise getExerciseById(String exerciseId) {
+    try {
+      return _allExercises.firstWhere(
+        (e) => e.id == exerciseId,
+        orElse: () => Exercise.empty(),
+      );
+    } catch (e) {
+      debugPrint('Ошибка при получении упражнения по ID: $e');
+      return Exercise.empty();
+    }
+  }
+
+  // Получить все упражнения
+  List<Exercise> getAllExercises() {
+    return List.from(_allExercises);
+  }
+
+  // Получить альтернативные упражнения с учетом доступного оборудования
+  List<Exercise> getAlternativeExercisesForExercise(String exerciseId) {
+    try {
+      final currentExercise = getExerciseById(exerciseId);
+      if (currentExercise.id.isEmpty) return [];
+      
+      final availableEquipment = state.userPreferences?.availableEquipment ?? [];
+      
+      // Фильтруем упражнения по доступному оборудованию и группе мышц
+      return _allExercises.where((exercise) {
+        // Не показываем текущее упражнение
+        if (exercise.id == exerciseId) return false;
+        
+        // Проверяем доступность оборудования
+        final hasEquipment = exercise.requiredEquipment.isEmpty ||
+            exercise.requiredEquipment.every((requiredEq) =>
+                availableEquipment.any((availEq) => availEq.name == requiredEq));
+        
+        if (!hasEquipment) return false;
+        
+        // Ищем упражнения на ту же группу мышц
+        final samePrimaryMuscle = exercise.primaryMuscleGroup == currentExercise.primaryMuscleGroup;
+        final primaryInSecondary = exercise.secondaryMuscleGroups.contains(currentExercise.primaryMuscleGroup);
+        final secondaryInPrimary = currentExercise.secondaryMuscleGroups.contains(exercise.primaryMuscleGroup);
+        
+        return samePrimaryMuscle || primaryInSecondary || secondaryInPrimary;
+      }).toList();
+    } catch (e) {
+      debugPrint('Ошибка при получении альтернативных упражнений: $e');
+      return [];
+    }
+  }
+
+  // Обновить параметры упражнения (подходы, повторения, отдых)
+  Future<void> updateExerciseParameters({
+    required String workoutId,
+    required int exerciseIndex,
+    required int sets,
+    required int reps,
+    required int restTime,
+  }) async {
+    try {
+      final workoutIndex = state.workouts.indexWhere((w) => w.id == workoutId);
+      if (workoutIndex == -1) return;
+      
+      final workout = state.workouts[workoutIndex];
+      if (exerciseIndex >= workout.exercises.length) return;
+      
+      final exercise = workout.exercises[exerciseIndex];
+      
+      // Обновляем упражнение с новыми параметрами
+      final updatedExercise = exercise.copyWith(
+        sets: sets,
+        reps: reps,
+        restTime: restTime,
+        // Сбрасываем completedSets под новый размер
+        completedSets: List.filled(sets, false),
+      );
+      
+      // Создаем обновленный список упражнений
+      final updatedExercises = List<WorkoutExercise>.from(workout.exercises);
+      updatedExercises[exerciseIndex] = updatedExercise;
+      
+      // Создаем обновленную тренировку
+      final updatedWorkout = workout.copyWith(exercises: updatedExercises);
+      
+      // Создаем обновленный список тренировок
+      final updatedWorkouts = List<Workout>.from(state.workouts);
+      updatedWorkouts[workoutIndex] = updatedWorkout;
+      
+      // Обновляем state
+      state = state.copyWith(workouts: updatedWorkouts);
+    } catch (e) {
+      debugPrint('Ошибка при обновлении параметров упражнения: $e');
+    }
+  }
+
+  // ============ СУЩЕСТВУЮЩИЕ МЕТОДЫ (ОБНОВЛЕНЫЕ) ============
+
+  // Получение альтернативных упражнений (старый метод, для совместимости)
   List<Exercise> getAlternativeExercises(String exerciseId) {
     try {
       final currentExercise = _allExercises.firstWhere(
@@ -249,7 +385,8 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
       if (exerciseIndex >= workout.exercises.length) return;
       
       // Создаем копию упражнения с новым ID
-      final updatedExercise = workout.exercises[exerciseIndex].copyWith(
+      final exercise = workout.exercises[exerciseIndex];
+      final updatedExercise = exercise.copyWith(
         exerciseId: newExerciseId,
       );
       
@@ -400,6 +537,142 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
     }
   }
 
+  // Получить общее количество выполненных подходов
+  int getTotalCompletedSets() {
+    return state.workouts.fold(0, (total, workout) {
+      return total + workout.exercises.fold(0, (sum, exercise) {
+        return sum + exercise.completedSets.where((c) => c).length;
+      });
+    });
+  }
+
+  // Получить общее количество подходов в плане
+  int getTotalSets() {
+    return state.workouts.fold(0, (total, workout) {
+      return total + workout.exercises.fold(0, (sum, exercise) => sum + exercise.sets);
+    });
+  }
+
+  // Получить статистику по плану
+  Map<String, dynamic> getPlanStatistics() {
+    final totalSets = getTotalSets();
+    final completedSets = getTotalCompletedSets();
+    final completedWorkouts = state.workouts.where((w) => w.completed).length;
+    final totalWorkouts = state.workouts.length;
+    
+    return {
+      'totalWorkouts': totalWorkouts,
+      'completedWorkouts': completedWorkouts,
+      'workoutCompletionRate': totalWorkouts > 0 ? completedWorkouts / totalWorkouts : 0.0,
+      'totalSets': totalSets,
+      'completedSets': completedSets,
+      'setCompletionRate': totalSets > 0 ? completedSets / totalSets : 0.0,
+      'planProgress': getProgress(),
+    };
+  }
+
+  // Добавить новое упражнение в тренировку
+  Future<void> addExerciseToWorkout({
+    required String workoutId,
+    required String exerciseId,
+    int sets = 3,
+    int reps = 10,
+    int restTime = 60,
+  }) async {
+    try {
+      final workoutIndex = state.workouts.indexWhere((w) => w.id == workoutId);
+      if (workoutIndex == -1) return;
+      
+      final workout = state.workouts[workoutIndex];
+      
+      // Создаем новое упражнение
+      final newExercise = WorkoutExercise(
+        exerciseId: exerciseId,
+        sets: sets,
+        reps: reps,
+        restTime: restTime,
+      );
+      
+      // Добавляем к существующим упражнениям
+      final updatedExercises = List<WorkoutExercise>.from(workout.exercises);
+      updatedExercises.add(newExercise);
+      
+      // Обновляем тренировку
+      final updatedWorkout = workout.copyWith(
+        exercises: updatedExercises,
+        duration: workout.duration + 15, // Увеличиваем длительность на 15 минут
+      );
+      
+      // Обновляем список тренировок
+      final updatedWorkouts = List<Workout>.from(state.workouts);
+      updatedWorkouts[workoutIndex] = updatedWorkout;
+      
+      // Обновляем state
+      state = state.copyWith(workouts: updatedWorkouts);
+    } catch (e) {
+      debugPrint('Ошибка при добавлении упражнения: $e');
+    }
+  }
+
+  // Удалить упражнение из тренировки
+  Future<void> removeExerciseFromWorkout({
+    required String workoutId,
+    required int exerciseIndex,
+  }) async {
+    try {
+      final workoutIndex = state.workouts.indexWhere((w) => w.id == workoutId);
+      if (workoutIndex == -1) return;
+      
+      final workout = state.workouts[workoutIndex];
+      if (exerciseIndex >= workout.exercises.length) return;
+      
+      // Удаляем упражнение
+      final updatedExercises = List<WorkoutExercise>.from(workout.exercises);
+      updatedExercises.removeAt(exerciseIndex);
+      
+      // Обновляем тренировку
+      final updatedWorkout = workout.copyWith(
+        exercises: updatedExercises,
+        duration: workout.duration > 15 ? workout.duration - 15 : 30, // Уменьшаем длительность
+      );
+      
+      // Обновляем список тренировок
+      final updatedWorkouts = List<Workout>.from(state.workouts);
+      updatedWorkouts[workoutIndex] = updatedWorkout;
+      
+      // Обновляем state
+      state = state.copyWith(workouts: updatedWorkouts);
+    } catch (e) {
+      debugPrint('Ошибка при удалении упражнения: $e');
+    }
+  }
+
+  // Перемешать упражнения в тренировке
+  Future<void> shuffleWorkoutExercises(String workoutId) async {
+    try {
+      final workoutIndex = state.workouts.indexWhere((w) => w.id == workoutId);
+      if (workoutIndex == -1) return;
+      
+      final workout = state.workouts[workoutIndex];
+      
+      // Создаем копию списка упражнений и перемешиваем
+      final shuffledExercises = List<WorkoutExercise>.from(workout.exercises);
+      shuffledExercises.shuffle();
+      
+      // Обновляем тренировку
+      final updatedWorkout = workout.copyWith(exercises: shuffledExercises);
+      
+      // Обновляем список тренировок
+      final updatedWorkouts = List<Workout>.from(state.workouts);
+      updatedWorkouts[workoutIndex] = updatedWorkout;
+      
+      // Обновляем state
+      state = state.copyWith(workouts: updatedWorkouts);
+    } catch (e) {
+      debugPrint('Ошибка при перемешивании упражнений: $e');
+    }
+  }
+
   // Экспорт плана в текстовый формат
   String exportPlanToText() {
     final buffer = StringBuffer();
@@ -410,28 +683,57 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
     buffer.writeln('Название: ${state.name}');
     buffer.writeln('Описание: ${state.description}');
     buffer.writeln('Создан: ${state.createdAt.toLocal().toString().split(' ')[0]}');
+    
+    if (state.userPreferences != null) {
+      buffer.writeln();
+      buffer.writeln('ПАРАМЕТРЫ ПОЛЬЗОВАТЕЛЯ:');
+      buffer.writeln('Цель: ${state.userPreferences!.goal?.displayName ?? "Не указано"}');
+      buffer.writeln('Уровень: ${state.userPreferences!.experienceLevel?.displayName ?? "Не указано"}');
+      buffer.writeln('Дней в неделю: ${state.userPreferences!.daysPerWeek ?? "Не указано"}');
+      buffer.writeln('Длительность тренировки: ${state.userPreferences!.sessionDuration ?? "Не указано"} мин');
+      buffer.writeln('Оборудование: ${state.userPreferences!.availableEquipment.map((e) => e.displayName).join(", ")}');
+    }
+    
+    buffer.writeln();
+    buffer.writeln('=' * 50);
+    buffer.writeln();
+    
+    final statistics = getPlanStatistics();
+    buffer.writeln('СТАТИСТИКА:');
+    buffer.writeln('Прогресс плана: ${(statistics['planProgress']! * 100).toStringAsFixed(1)}%');
+    buffer.writeln('Завершено тренировок: ${statistics['completedWorkouts']}/${statistics['totalWorkouts']}');
+    buffer.writeln('Завершено подходов: ${statistics['completedSets']}/${statistics['totalSets']}');
+    
     buffer.writeln();
     buffer.writeln('=' * 50);
     buffer.writeln();
     
     for (final workout in state.workouts) {
+      final dayNames = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+      final dayName = workout.dayOfWeek >= 1 && workout.dayOfWeek <= 7 
+          ? dayNames[workout.dayOfWeek - 1] 
+          : 'День ${workout.dayOfWeek}';
+      
       buffer.writeln(workout.name.toUpperCase());
+      buffer.writeln('День недели: $dayName');
       buffer.writeln('Длительность: ${workout.duration} минут');
       buffer.writeln('Статус: ${workout.completed ? "✅ Выполнено" : "⏳ Ожидание"}');
       buffer.writeln();
       
       for (int i = 0; i < workout.exercises.length; i++) {
         final exercise = workout.exercises[i];
-        final exDetails = _allExercises.firstWhere(
-          (e) => e.id == exercise.exerciseId,
-          orElse: () => Exercise.empty(),
-        );
+        final exDetails = getExerciseById(exercise.exerciseId);
         
         if (exDetails.id.isNotEmpty) {
           buffer.writeln('${i + 1}. ${exDetails.name}');
           buffer.writeln('   Подходы: ${exercise.sets} × ${exercise.reps > 0 ? exercise.reps : "до утомления"}');
           buffer.writeln('   Отдых: ${exercise.restTime} сек');
           buffer.writeln('   Выполнено: ${exercise.completedSets.where((c) => c).length}/${exercise.sets}');
+          
+          if (exDetails.description.isNotEmpty) {
+            buffer.writeln('   Описание: ${exDetails.description}');
+          }
+          
           buffer.writeln();
         }
       }
@@ -440,7 +742,7 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
       buffer.writeln();
     }
     
-    buffer.writeln('Общий прогресс: ${(getProgress() * 100).toStringAsFixed(1)}%');
+    buffer.writeln('Желаем продуктивных тренировок! 💪');
     
     return buffer.toString();
   }
