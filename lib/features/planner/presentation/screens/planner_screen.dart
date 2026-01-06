@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fitplan_creator/core/widgets/custom_button.dart';
 import 'package:fitplan_creator/features/planner/providers/planner_provider.dart';
+import 'package:fitplan_creator/features/profile/providers/profile_provider.dart';
 import 'package:fitplan_creator/features/planner/presentation/widgets/exercise_search_sheet.dart';
 import 'package:fitplan_creator/features/planner/presentation/widgets/reorderable_exercise_list.dart';
 import 'package:fitplan_creator/data/models/workout_plan.dart';
@@ -28,6 +29,14 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       appBar: AppBar(
         title: const Text('Ваш план тренировок'),
         actions: [
+          // Кнопка профиля
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              context.go('/profile');
+            },
+            tooltip: 'Профиль',
+          ),
           IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: () {
@@ -388,7 +397,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     );
   }
 
-  // Завершить тренировку
+  // Завершить тренировку (обновленная версия с интеграцией профиля)
   void _completeWorkout(BuildContext context, WidgetRef ref, String workoutId) {
     final plan = ref.read(plannerProvider);
     final workoutIndex = plan.workouts.indexWhere((w) => w.id == workoutId);
@@ -396,8 +405,14 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     
     final workout = plan.workouts[workoutIndex];
     
+    // Собираем статистику по группам мышц для профиля
+    final repository = WorkoutRepository();
+    final muscleGroups = <String, int>{};
+    
     for (int i = 0; i < workout.exercises.length; i++) {
       final exercise = workout.exercises[i];
+      
+      // Обновляем выполнение каждого подхода
       for (int j = 0; j < exercise.sets; j++) {
         ref.read(plannerProvider.notifier).updateSetCompletion(
           dayId: workoutId,
@@ -406,7 +421,21 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
           completed: true,
         );
       }
+      
+      // Собираем статистику по группам мышц
+      final exerciseDetails = repository.getExerciseById(exercise.exerciseId);
+      final primaryMuscleGroup = exerciseDetails.primaryMuscleGroup;
+      if (primaryMuscleGroup.isNotEmpty) {
+        muscleGroups[primaryMuscleGroup] = (muscleGroups[primaryMuscleGroup] ?? 0) + 1;
+      }
     }
+    
+    // Обновляем статистику в профиле
+    ref.read(profileProvider.notifier).updateStatsAfterWorkout(
+      duration: workout.duration,
+      exercisesCount: workout.exercises.length,
+      muscleGroups: muscleGroups,
+    );
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

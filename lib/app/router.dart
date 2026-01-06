@@ -3,6 +3,7 @@ import 'package:fitplan_creator/features/onboarding/presentation/screens/welcome
 import 'package:fitplan_creator/features/onboarding/presentation/screens/loading_screen.dart';
 import 'package:fitplan_creator/features/planner/presentation/screens/planner_screen.dart';
 import 'package:fitplan_creator/features/questionnaire/screens/questionnaire_screen.dart';
+import 'package:fitplan_creator/features/profile/presentation/screens/profile_screen.dart';
 
 final router = GoRouter(
   initialLocation: '/welcome',
@@ -22,6 +23,10 @@ final router = GoRouter(
     GoRoute(
       path: '/planner',
       builder: (context, state) => const PlannerScreen(),
+    ),
+    GoRoute(
+      path: '/profile',
+      builder: (context, state) => const ProfileScreen(),
     ),
   ],
 );
