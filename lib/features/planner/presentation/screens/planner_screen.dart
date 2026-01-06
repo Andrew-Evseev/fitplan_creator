@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fitplan_creator/core/widgets/custom_button.dart';
 import 'package:fitplan_creator/features/planner/providers/planner_provider.dart';
-import 'package:fitplan_creator/features/planner/presentation/widgets/exercise_replacement_bottom_sheet.dart';
+import 'package:fitplan_creator/features/planner/presentation/widgets/exercise_search_sheet.dart';
+import 'package:fitplan_creator/features/planner/presentation/widgets/reorderable_exercise_list.dart';
 import 'package:fitplan_creator/data/models/workout_plan.dart';
 import 'package:fitplan_creator/data/models/workout_exercise.dart';
+import 'package:fitplan_creator/data/repositories/workout_repository.dart';
 
 class PlannerScreen extends ConsumerStatefulWidget {
   const PlannerScreen({super.key});
@@ -267,8 +269,49 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
           ],
         ),
         children: [
-          for (final entry in workout.exercises.asMap().entries)
-            _buildExerciseTile(context, ref, workout, entry.value, entry.key),
+          // Drag-and-drop список упражнений
+          Container(
+            constraints: BoxConstraints(
+              maxHeight: 400.0, // Ограничиваем максимальную высоту
+            ),
+            child: ReorderableExerciseList(
+              exercises: workout.exercises,
+              workoutId: workout.id,
+              onReorder: (oldIndex, newIndex) {
+                // Вызываем метод в провайдере для перестановки упражнений
+                ref.read(plannerProvider.notifier).reorderExercise(
+                  workoutId: workout.id,
+                  oldIndex: oldIndex,
+                  newIndex: newIndex,
+                );
+              },
+              onEdit: (exerciseIndex) {
+                _editExerciseParameters(
+                  context, 
+                  ref, 
+                  workout.id, 
+                  exerciseIndex, 
+                  workout.exercises[exerciseIndex]
+                );
+              },
+              onReplace: (exerciseIndex) {
+                _replaceExercise(
+                  context, 
+                  ref, 
+                  workout.id, 
+                  exerciseIndex, 
+                  workout.exercises[exerciseIndex].exerciseId
+                );
+              },
+              onTap: (exerciseIndex) {
+                _showExerciseDetails(
+                  context, 
+                  ref, 
+                  workout.exercises[exerciseIndex]
+                );
+              },
+            ),
+          ),
           
           Padding(
             padding: const EdgeInsets.all(12.0),
@@ -297,150 +340,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // Плитка упражнения
-  Widget _buildExerciseTile(
-    BuildContext context,
-    WidgetRef ref,
-    Workout workout,
-    WorkoutExercise exercise,
-    int exerciseIndex,
-  ) {
-    final completedSets = exercise.completedSets.where((c) => c).length;
-    final totalSets = exercise.sets;
-    final exerciseDetails = ref.read(plannerProvider.notifier).getExerciseById(exercise.exerciseId);
-    
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: Colors.grey.shade50,
-      ),
-      child: ListTile(
-        leading: GestureDetector(
-          onTap: () {
-            _showExerciseDetails(context, ref, exercise);
-          },
-          child: CircleAvatar(
-            backgroundColor: completedSets == totalSets 
-                ? const Color(0xFFE8F5E9)
-                : const Color(0xFFE3F2FD),
-            child: Icon(
-              completedSets == totalSets 
-                  ? Icons.check 
-                  : Icons.fitness_center,
-              color: completedSets == totalSets ? const Color(0xFF4CAF50) : const Color(0xFF2196F3),
-            ),
-          ),
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                exerciseDetails.id.isNotEmpty 
-                    ? exerciseDetails.name 
-                    : exercise.exerciseId,
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: completedSets == totalSets 
-                    ? const Color(0xFFE8F5E9)
-                    : const Color(0xFFE3F2FD),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: completedSets == totalSets ? const Color(0xFF4CAF50) : const Color(0xFF2196F3),
-                  width: 1,
-                ),
-              ),
-              child: Text(
-                '$completedSets/$totalSets',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: completedSets == totalSets ? const Color(0xFF4CAF50) : const Color(0xFF2196F3),
-                ),
-              ),
-            ),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${exercise.sets} × ${exercise.reps} повторений • Отдых: ${exercise.restTime} сек',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: List.generate(exercise.sets, (setIndex) {
-                final isCompleted = setIndex < exercise.completedSets.length 
-                    ? exercise.completedSets[setIndex] 
-                    : false;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      ref.read(plannerProvider.notifier).updateSetCompletion(
-                        dayId: workout.id,
-                        exerciseIndex: exerciseIndex,
-                        setIndex: setIndex,
-                        completed: !isCompleted,
-                      );
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 4),
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: isCompleted ? const Color(0xFF4CAF50) : Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${setIndex + 1}',
-                          style: TextStyle(
-                            color: isCompleted ? Colors.white : Colors.grey.shade600,
-                            fontSize: 8,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.swap_horiz, size: 20),
-              onPressed: () {
-                _replaceExercise(context, ref, workout.id, exerciseIndex, exercise.exerciseId);
-              },
-              tooltip: 'Заменить упражнение',
-            ),
-            IconButton(
-              icon: const Icon(Icons.edit, size: 20),
-              onPressed: () {
-                _editExerciseParameters(context, ref, workout.id, exerciseIndex, exercise);
-              },
-              tooltip: 'Редактировать параметры',
-            ),
-          ],
-        ),
-        onTap: () {
-          _showExerciseDetails(context, ref, exercise);
-        },
       ),
     );
   }
@@ -538,14 +437,29 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     int exerciseIndex,
     String currentExerciseId,
   ) {
+    // Получаем текущее упражнение для определения группы мышц
+    final repository = WorkoutRepository();
+    final currentExercise = repository.getExerciseById(currentExerciseId);
+    final currentMuscleGroup = currentExercise.primaryMuscleGroup;
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ExerciseReplacementBottomSheet(
-        workoutId: workoutId,
-        exerciseIndex: exerciseIndex,
-        currentExerciseId: currentExerciseId,
+      builder: (context) => ExerciseSearchSheet(
+        onExerciseSelected: (exercise) {
+          ref.read(plannerProvider.notifier).replaceExercise(
+            dayId: workoutId,
+            exerciseIndex: exerciseIndex,
+            newExerciseId: exercise.id,
+          );
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Упражнение заменено на ${exercise.name}'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        },
+        currentMuscleGroup: currentMuscleGroup,
       ),
     );
   }
@@ -609,7 +523,6 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 final newReps = int.tryParse(repsController.text) ?? exercise.reps;
                 final newRest = int.tryParse(restController.text) ?? exercise.restTime;
                 
-                // Используем переменные
                 ref.read(plannerProvider.notifier).updateExerciseParameters(
                   workoutId: workoutId,
                   exerciseIndex: exerciseIndex,
@@ -677,9 +590,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
               
               const SizedBox(height: 16),
               
-              if (exerciseDetails.description.isNotEmpty)
+              if (exerciseDetails.description?.isNotEmpty ?? false)
                 Text(
-                  exerciseDetails.description,
+                  exerciseDetails.description!,
                   style: const TextStyle(
                     fontSize: 16,
                     color: Colors.grey,
@@ -708,7 +621,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
               
               const SizedBox(height: 20),
               
-              if (exerciseDetails.instructions.isNotEmpty) ...[
+              if (exerciseDetails.instructions?.isNotEmpty ?? false) ...[
                 const Text(
                   'Техника выполнения:',
                   style: TextStyle(
@@ -718,7 +631,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  exerciseDetails.instructions,
+                  exerciseDetails.instructions!,
                   style: const TextStyle(
                     fontSize: 14,
                     color: Colors.grey,

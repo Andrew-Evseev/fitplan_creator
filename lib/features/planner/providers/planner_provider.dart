@@ -250,7 +250,47 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
     return adaptedExercises;
   }
 
-  // ============ НОВЫЕ ПУБЛИЧНЫЕ МЕТОДЫ ============
+  // ============ НОВЫЙ МЕТОД ДЛЯ DRAG-AND-DROP ============
+
+  // Перестановка упражнений в тренировке
+  void reorderExercise({
+    required String workoutId,
+    required int oldIndex,
+    required int newIndex,
+  }) {
+    try {
+      // Находим тренировку по ID
+      final workoutIndex = state.workouts.indexWhere((w) => w.id == workoutId);
+      if (workoutIndex == -1) return;
+      
+      final workout = state.workouts[workoutIndex];
+      final exercises = [...workout.exercises];
+      
+      // Корректируем новый индекс, если старый индекс меньше нового
+      // (это нужно, потому что когда мы удаляем элемент, индексы смещаются)
+      if (oldIndex < newIndex) {
+        newIndex -= 1;
+      }
+      
+      // Извлекаем упражнение из старого положения и вставляем в новое
+      final exercise = exercises.removeAt(oldIndex);
+      exercises.insert(newIndex, exercise);
+      
+      // Создаем обновленную тренировку
+      final updatedWorkout = workout.copyWith(exercises: exercises);
+      
+      // Создаем обновленный список тренировок
+      final updatedWorkouts = List<Workout>.from(state.workouts);
+      updatedWorkouts[workoutIndex] = updatedWorkout;
+      
+      // Обновляем state
+      state = state.copyWith(workouts: updatedWorkouts);
+    } catch (e) {
+      debugPrint('Ошибка при перестановке упражнения: $e');
+    }
+  }
+
+  // ============ ПУБЛИЧНЫЕ МЕТОДЫ ============
 
   // Получить упражнение по ID
   Exercise getExerciseById(String exerciseId) {
@@ -346,8 +386,6 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
       debugPrint('Ошибка при обновлении параметров упражнения: $e');
     }
   }
-
-  // ============ СУЩЕСТВУЮЩИЕ МЕТОДЫ (ОБНОВЛЕНЫЕ) ============
 
   // Получение альтернативных упражнений (старый метод, для совместимости)
   List<Exercise> getAlternativeExercises(String exerciseId) {

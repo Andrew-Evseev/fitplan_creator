@@ -66,6 +66,8 @@ class _QuestionnaireScreenState extends ConsumerState<QuestionnaireScreen> {
       final localContext = context;
       
       // Показываем индикатор загрузки
+      // ИСПРАВЛЕНО: проверка mounted перед использованием контекста
+      if (!mounted) return;
       showDialog(
         context: localContext,
         barrierDismissible: false,
@@ -78,9 +80,11 @@ class _QuestionnaireScreenState extends ConsumerState<QuestionnaireScreen> {
         
         // Проверяем mounted перед закрытием диалога
         if (mounted) {
+          // ИСПРАВЛЕНО: проверка mounted перед каждым использованием контекста
           Navigator.of(localContext, rootNavigator: true).pop();
           // Проверяем mounted перед переходом
           if (mounted) {
+            // ИСПРАВЛЕНО: проверка mounted перед использованием GoRouter
             GoRouter.of(localContext).go('/loading');
           }
         }
