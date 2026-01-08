@@ -16,7 +16,7 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
           userId: 'temp',
           name: 'Мой план тренировок',
           description: 'Персональный план',
-          workouts: [],
+          workouts: const [],
           createdAt: DateTime.now(),
           userPreferences: null,
         )) {
@@ -65,14 +65,14 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
 
       final workouts = [
         Workout(
-          id: 'day1',
-          name: 'День 1: Верх тела + Ноги',
-          dayOfWeek: 1,
-          exercises: day1Exercises,
-          duration: 45,
-          completed: false,
-        ),
-        Workout(
+  id: 'day1',
+  name: 'День 1: Верх тела + Ноги',
+  dayOfWeek: 1,
+  exercises: day1Exercises,
+  duration: 45,
+  completed: false,
+),
+         Workout(
           id: 'day2',
           name: 'День 2: Спина + Руки',
           dayOfWeek: 3,
