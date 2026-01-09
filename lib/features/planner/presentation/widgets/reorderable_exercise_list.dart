@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fitplan_creator/data/models/workout_exercise.dart';
 import 'package:fitplan_creator/data/repositories/workout_repository.dart';
+import 'package:fitplan_creator/data/models/exercise.dart';
 
 class ReorderableExerciseList extends StatefulWidget {
   final List<WorkoutExercise> exercises;
@@ -54,6 +55,9 @@ class _ReorderableExerciseListState extends State<ReorderableExerciseList> {
     final completedSets = exercise.completedSets.where((c) => c).length;
     final totalSets = exercise.sets;
 
+    // Безопасное получение названия упражнения
+    final exerciseName = _getExerciseName(exerciseDetails, exercise.exerciseId);
+
     return Container(
       key: key,
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -66,7 +70,7 @@ class _ReorderableExerciseListState extends State<ReorderableExerciseList> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withAlpha(25), // Замена withOpacity(0.1) на withAlpha(25)
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -118,9 +122,7 @@ class _ReorderableExerciseListState extends State<ReorderableExerciseList> {
               children: [
                 Expanded(
                   child: Text(
-                    exerciseDetails.id.isNotEmpty 
-                        ? exerciseDetails.name 
-                        : exercise.exerciseId,
+                    exerciseName,
                     style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                 ),
@@ -221,5 +223,13 @@ class _ReorderableExerciseListState extends State<ReorderableExerciseList> {
         ],
       ),
     );
+  }
+
+  // Вспомогательный метод для безопасного получения названия упражнения
+  String _getExerciseName(Exercise exercise, String exerciseId) {
+    if (exercise.id.isNotEmpty) {
+      return exercise.name;
+    }
+    return exerciseId;
   }
 }

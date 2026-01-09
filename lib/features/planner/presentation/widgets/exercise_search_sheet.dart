@@ -36,7 +36,7 @@ class _ExerciseSearchSheetState extends State<ExerciseSearchSheet> {
     // Если передана группа мышц, фильтруем по ней
     if (widget.currentMuscleGroup != null) {
       _filteredExercises = _exercises.where((exercise) =>
-        exercise.primaryMuscleGroup == widget.currentMuscleGroup
+        exercise.primaryMuscleGroups.contains(widget.currentMuscleGroup!)
       ).toList();
     }
     
@@ -53,7 +53,9 @@ class _ExerciseSearchSheetState extends State<ExerciseSearchSheet> {
 
     final filtered = _exercises.where((exercise) {
       return exercise.name.toLowerCase().contains(query.toLowerCase()) ||
-             (exercise.description?.toLowerCase().contains(query.toLowerCase()) ?? false);
+             exercise.description.toLowerCase().contains(query.toLowerCase()) ||
+             exercise.primaryMuscleGroups.any((muscle) => 
+                muscle.toLowerCase().contains(query.toLowerCase()));
     }).toList();
 
     setState(() {
@@ -137,14 +139,44 @@ class _ExerciseSearchSheetState extends State<ExerciseSearchSheet> {
 
               // Список упражнений
               Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  itemCount: _filteredExercises.length,
-                  itemBuilder: (context, index) {
-                    final exercise = _filteredExercises[index];
-                    return _buildExerciseItem(exercise);
-                  },
-                ),
+                child: _filteredExercises.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.search_off,
+                                size: 64,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Упражнения не найдены',
+                                style: TextStyle(fontSize: 18),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Попробуйте изменить поисковый запрос',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        itemCount: _filteredExercises.length,
+                        itemBuilder: (context, index) {
+                          final exercise = _filteredExercises[index];
+                          return _buildExerciseItem(exercise);
+                        },
+                      ),
               ),
             ],
           ),
@@ -154,19 +186,25 @@ class _ExerciseSearchSheetState extends State<ExerciseSearchSheet> {
   }
 
   Widget _buildExerciseItem(Exercise exercise) {
-    // Используем безопасное получение difficulty
-    final difficulty = exercise.difficulty.isNotEmpty ? exercise.difficulty.toLowerCase() : 'легкий';
+    // Используем первую группу мышц
+    final primaryMuscle = exercise.primaryMuscleGroups.isNotEmpty 
+        ? exercise.primaryMuscleGroups.first 
+        : 'Не указана';
+    
+    // Используем название сложности из enum
+    final difficulty = exercise.difficulty.name;
     final difficultyColor = _getDifficultyColor(difficulty);
     
-    final muscleGroup = exercise.primaryMuscleGroup;
-    final equipment = exercise.requiredEquipment?.join(', ') ?? 'Не указано';
+    final equipment = exercise.requiredEquipment.isNotEmpty 
+        ? exercise.requiredEquipment.join(', ') 
+        : 'Не указано';
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: ListTile(
         leading: PulsingExerciseIcon(
           exerciseId: exercise.id,
-          muscleGroup: muscleGroup,
+          muscleGroup: primaryMuscle,
           size: 45,
           isActive: true,
           onTap: () {
@@ -182,27 +220,28 @@ class _ExerciseSearchSheetState extends State<ExerciseSearchSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              muscleGroup,
+              primaryMuscle,
               style: const TextStyle(fontSize: 12),
             ),
             const SizedBox(height: 4),
             Row(
               children: [
                 Chip(
-                  label: Text(difficulty),
+                  label: Text(_getDifficultyDisplayName(difficulty)),
                   backgroundColor: difficultyColor,
                   labelStyle: const TextStyle(fontSize: 10),
                 ),
                 const SizedBox(width: 4),
-                Chip(
-                  label: Text(
-                    equipment,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                if (exercise.requiredEquipment.isNotEmpty)
+                  Chip(
+                    label: Text(
+                      equipment,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    backgroundColor: Colors.blue[50],
+                    labelStyle: const TextStyle(fontSize: 10),
                   ),
-                  backgroundColor: Colors.blue[50],
-                  labelStyle: const TextStyle(fontSize: 10),
-                ),
               ],
             ),
           ],
@@ -218,16 +257,26 @@ class _ExerciseSearchSheetState extends State<ExerciseSearchSheet> {
   Color? _getDifficultyColor(String difficulty) {
     switch (difficulty) {
       case 'beginner':
-      case 'начинающий':
         return Colors.green[50];
       case 'intermediate':
-      case 'средний':
         return Colors.orange[50];
       case 'advanced':
-      case 'продвинутый':
         return Colors.red[50];
       default:
         return Colors.grey[50];
+    }
+  }
+
+  String _getDifficultyDisplayName(String difficulty) {
+    switch (difficulty) {
+      case 'beginner':
+        return 'Начинающий';
+      case 'intermediate':
+        return 'Средний';
+      case 'advanced':
+        return 'Продвинутый';
+      default:
+        return difficulty;
     }
   }
 }

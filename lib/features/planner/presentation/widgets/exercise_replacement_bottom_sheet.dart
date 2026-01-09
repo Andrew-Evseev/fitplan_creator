@@ -22,10 +22,13 @@ class ExerciseReplacementBottomSheet extends ConsumerWidget {
     final repository = WorkoutRepository();
     final availableEquipment = ref.watch(questionnaireProvider).availableEquipment;
     
+    // ИСПРАВЛЕНО: получаем equipment как список строк
+    final availableEquipmentNames = availableEquipment.map((e) => e.name).toList();
+    
     final currentExercise = repository.getExerciseById(currentExerciseId);
     final alternativeExercises = repository.findAlternativeExercises(
       currentExerciseId,
-      availableEquipment,
+      availableEquipmentNames,
     );
 
     return Container(
@@ -64,7 +67,7 @@ class ExerciseReplacementBottomSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           
-          if (currentExercise.id.isNotEmpty)
+          if (currentExercise != null && currentExercise.id.isNotEmpty)
             Card(
               color: const Color(0xFFE3F2FD),
               child: Padding(
@@ -98,6 +101,28 @@ class ExerciseReplacementBottomSheet extends ConsumerWidget {
                   ],
                 ),
               ),
+            )
+          else
+            Card(
+              color: const Color(0xFFFFF3E0),
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline, color: Color(0xFFF57C00)),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Упражнение не найдено',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           
           const SizedBox(height: 16),
@@ -113,17 +138,23 @@ class ExerciseReplacementBottomSheet extends ConsumerWidget {
           
           Wrap(
             spacing: 8,
-            children: const [
+            children: [
               FilterChip(
-                label: Text('По группе мышц'),
+                label: const Text('По группе мышц'),
                 selected: true,
                 onSelected: null,
               ),
               FilterChip(
-                label: Text('По оборудованию'),
+                label: const Text('По оборудованию'),
                 selected: true,
                 onSelected: null,
               ),
+              if (currentExercise != null && currentExercise.difficulty.name.isNotEmpty)
+                FilterChip(
+                  label: Text('Сложность: ${_getDifficultyName(currentExercise.difficulty.name)}'),
+                  selected: true,
+                  onSelected: null,
+                ),
             ],
           ),
           
@@ -199,6 +230,19 @@ class ExerciseReplacementBottomSheet extends ConsumerWidget {
       ),
     );
   }
+  
+  String _getDifficultyName(String difficulty) {
+    switch (difficulty) {
+      case 'beginner':
+        return 'Начинающий';
+      case 'intermediate':
+        return 'Средний';
+      case 'advanced':
+        return 'Продвинутый';
+      default:
+        return difficulty;
+    }
+  }
 }
 
 class ExerciseCard extends StatelessWidget {
@@ -230,30 +274,13 @@ class ExerciseCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   color: Colors.grey[100],
                 ),
-                child: exercise.imageUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.asset(
-                          exercise.imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Center(
-                              child: Icon(
-                                Icons.fitness_center,
-                                color: Theme.of(context).primaryColor,
-                                size: 30,
-                              ),
-                            );
-                          },
-                        ),
-                      )
-                    : Center(
-                        child: Icon(
-                          Icons.fitness_center,
-                          color: Theme.of(context).primaryColor,
-                          size: 30,
-                        ),
-                      ),
+                child: Center(
+                  child: Icon(
+                    Icons.fitness_center,
+                    color: Theme.of(context).primaryColor,
+                    size: 30,
+                  ),
+                ),
               ),
               
               const SizedBox(width: 12),
@@ -287,24 +314,25 @@ class ExerciseCard extends StatelessWidget {
                       spacing: 6,
                       runSpacing: 4,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _getMuscleGroupColor(exercise.primaryMuscleGroup),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            _getMuscleGroupName(exercise.primaryMuscleGroup),
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
+                        if (exercise.primaryMuscleGroups.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getMuscleGroupColor(exercise.primaryMuscleGroups.first),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              exercise.primaryMuscleGroups.first,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
-                        ),
                         
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -312,11 +340,11 @@ class ExerciseCard extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: _getDifficultyColor(exercise.difficulty),
+                            color: _getDifficultyColor(exercise.difficulty.name),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            _getDifficultyName(exercise.difficulty),
+                            _getDifficultyName(exercise.difficulty.name),
                             style: const TextStyle(
                               fontSize: 10,
                               color: Colors.white,
@@ -363,42 +391,35 @@ class ExerciseCard extends StatelessWidget {
   
   Color _getMuscleGroupColor(String muscleGroup) {
     final colors = {
-      'chest': const Color(0xFFF44336),
-      'back': const Color(0xFF4CAF50),
-      'legs': const Color(0xFF2196F3),
-      'shoulders': const Color(0xFFFF9800),
-      'biceps': const Color(0xFF9C27B0),
-      'triceps': const Color(0xFFE91E63),
-      'core': const Color(0xFF009688),
-      'fullBody': const Color(0xFF3F51B5),
-      'calves': const Color(0xFF795548),
-      'glutes': const Color(0xFF673AB7),
-      'quadriceps': const Color(0xFF2196F3),
-      'hamstrings': const Color(0xFF4CAF50),
-      'forearms': const Color(0xFF9E9E9E),
-      'traps': const Color(0xFF607D8B),
+      'Грудные': const Color(0xFFF44336),
+      'Широчайшие': const Color(0xFF4CAF50),
+      'Ноги': const Color(0xFF2196F3),
+      'Плечи': const Color(0xFFFF9800),
+      'Бицепсы': const Color(0xFF9C27B0),
+      'Трицепсы': const Color(0xFFE91E63),
+      'Прямая мышца живота': const Color(0xFF009688),
+      'Квадрицепсы': const Color(0xFF2196F3),
+      'Ягодицы': const Color(0xFF673AB7),
+      'Задняя поверхность бедра': const Color(0xFF4CAF50),
+      'Икры': const Color(0xFF795548),
+      'Трапеции': const Color(0xFF607D8B),
+      'Предплечья': const Color(0xFF9E9E9E),
+      'Шея': const Color(0xFF9C27B0),
+      'Верх спины': const Color(0xFF4CAF50),
+      'Поясница': const Color(0xFF795548),
+      'Ромбовидные': const Color(0xFF4CAF50),
+      'Передние дельты': const Color(0xFFFF9800),
+      'Средние дельты': const Color(0xFFFF9800),
+      'Задние дельты': const Color(0xFFFF9800),
+      'Передняя поверхность бедра': const Color(0xFF2196F3),
+      'Внутренняя поверхность бедра': const Color(0xFFE91E63),
+      'Косые мышцы живота': const Color(0xFF009688),
+      'Нижняя часть пресса': const Color(0xFF009688),
+      'Внутренняя часть груди': const Color(0xFFF44336),
+      'Верхняя часть груди': const Color(0xFFF44336),
+      'Нижняя часть груди': const Color(0xFFF44336),
     };
     return colors[muscleGroup] ?? const Color(0xFF9E9E9E);
-  }
-  
-  String _getMuscleGroupName(String muscleGroup) {
-    final names = {
-      'chest': 'Грудь',
-      'back': 'Спина',
-      'legs': 'Ноги',
-      'shoulders': 'Плечи',
-      'biceps': 'Бицепс',
-      'triceps': 'Трицепс',
-      'core': 'Пресс',
-      'fullBody': 'Все тело',
-      'calves': 'Икры',
-      'glutes': 'Ягодицы',
-      'quadriceps': 'Квадрицепс',
-      'hamstrings': 'Бицепс бедра',
-      'forearms': 'Предплечья',
-      'traps': 'Трапеции',
-    };
-    return names[muscleGroup] ?? muscleGroup;
   }
   
   Color _getDifficultyColor(String difficulty) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fitplan_creator/data/models/workout_exercise.dart';
+import 'package:fitplan_creator/data/models/exercise.dart'; // ← ДОБАВЛЕН ИМПОРТ
 import 'package:fitplan_creator/data/repositories/workout_repository.dart';
 import 'pulsing_exercise_icon.dart';
 
@@ -27,6 +28,14 @@ class DraggableExerciseCard extends StatelessWidget {
     final exerciseDetails = repository.getExerciseById(exercise.exerciseId);
     final completedSets = exercise.completedSets.where((c) => c).length;
     final totalSets = exercise.sets;
+
+    // Безопасное получение данных - УПРОЩЕНО
+    final muscleGroup = exerciseDetails.primaryMuscleGroups.isNotEmpty 
+        ? exerciseDetails.primaryMuscleGroups.first 
+        : '';
+    final exerciseName = exerciseDetails.name.isNotEmpty 
+        ? exerciseDetails.name 
+        : exercise.exerciseId;
 
     return Material(
       color: Colors.transparent,
@@ -90,7 +99,7 @@ class DraggableExerciseCard extends StatelessWidget {
                 onTap: onTap,
                 child: PulsingExerciseIcon(
                   exerciseId: exercise.exerciseId,
-                  muscleGroup: exerciseDetails.primaryMuscleGroup,
+                  muscleGroup: muscleGroup,
                   size: 40,
                   isActive: !isDragging, // если перетаскиваем, то анимация останавливается
                   showBorder: true,
@@ -101,9 +110,7 @@ class DraggableExerciseCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      exerciseDetails.id.isNotEmpty 
-                          ? exerciseDetails.name 
-                          : exercise.exerciseId,
+                      exerciseName,
                       style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
                   ),

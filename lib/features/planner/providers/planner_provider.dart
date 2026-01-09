@@ -10,7 +10,7 @@ import 'package:fitplan_creator/data/repositories/workout_repository.dart';
 
 class PlannerNotifier extends StateNotifier<WorkoutPlan> {
   PlannerNotifier(this.workoutRepository)
-      : _allExercises = workoutRepository.getAllExercises(),
+      : _allExercises = workoutRepository.allExercises,
         super(WorkoutPlan(
           id: 'temp',
           userId: 'temp',
@@ -52,27 +52,27 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
     try {
       // Используем реальные упражнения для дефолтного плана
       final day1Exercises = [
-        WorkoutExercise(exerciseId: 'pushup', sets: 3, reps: 10),
-        WorkoutExercise(exerciseId: 'squat', sets: 3, reps: 12),
-        WorkoutExercise(exerciseId: 'plank', sets: 3, reps: 30),
+        WorkoutExercise(exerciseId: 'chest_01', sets: 3, reps: 10),
+        WorkoutExercise(exerciseId: 'legs_01', sets: 3, reps: 12),
+        WorkoutExercise(exerciseId: 'abs_02', sets: 3, reps: 30),
       ];
       
       final day2Exercises = [
-        WorkoutExercise(exerciseId: 'pull_up', sets: 3, reps: 8),
-        WorkoutExercise(exerciseId: 'bicep_curl', sets: 3, reps: 12),
-        WorkoutExercise(exerciseId: 'plank', sets: 3, reps: 30),
+        WorkoutExercise(exerciseId: 'back_01', sets: 3, reps: 8),
+        WorkoutExercise(exerciseId: 'arms_01', sets: 3, reps: 12),
+        WorkoutExercise(exerciseId: 'abs_02', sets: 3, reps: 30),
       ];
 
       final workouts = [
         Workout(
-  id: 'day1',
-  name: 'День 1: Верх тела + Ноги',
-  dayOfWeek: 1,
-  exercises: day1Exercises,
-  duration: 45,
-  completed: false,
-),
-         Workout(
+          id: 'day1',
+          name: 'День 1: Верх тела + Ноги',
+          dayOfWeek: 1,
+          exercises: day1Exercises,
+          duration: 45,
+          completed: false,
+        ),
+        Workout(
           id: 'day2',
           name: 'День 2: Спина + Руки',
           dayOfWeek: 3,
@@ -317,6 +317,7 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
       if (currentExercise.id.isEmpty) return [];
       
       final availableEquipment = state.userPreferences?.availableEquipment ?? [];
+      final availableEquipmentNames = availableEquipment.map((e) => e.name).toList();
       
       // Фильтруем упражнения по доступному оборудованию и группе мышц
       return _allExercises.where((exercise) {
@@ -326,16 +327,26 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
         // Проверяем доступность оборудования
         final hasEquipment = exercise.requiredEquipment.isEmpty ||
             exercise.requiredEquipment.every((requiredEq) =>
-                availableEquipment.any((availEq) => availEq.name == requiredEq));
+                availableEquipmentNames.contains(requiredEq));
         
         if (!hasEquipment) return false;
         
-        // Ищем упражнения на ту же группу мышц
-        final samePrimaryMuscle = exercise.primaryMuscleGroup == currentExercise.primaryMuscleGroup;
-        final primaryInSecondary = exercise.secondaryMuscleGroups.contains(currentExercise.primaryMuscleGroup);
-        final secondaryInPrimary = currentExercise.secondaryMuscleGroups.contains(exercise.primaryMuscleGroup);
+        // Ищем упражнения на схожие группы мышц
+        final currentPrimaryMuscles = currentExercise.primaryMuscleGroups;
+        final exercisePrimaryMuscles = exercise.primaryMuscleGroups;
         
-        return samePrimaryMuscle || primaryInSecondary || secondaryInPrimary;
+        // Проверяем пересечение основных групп мышц
+        final hasCommonPrimary = currentPrimaryMuscles.any((muscle) => 
+            exercisePrimaryMuscles.contains(muscle));
+        
+        // Проверяем пересечение основных и вторичных групп
+        final primaryInSecondary = exercisePrimaryMuscles.any((muscle) => 
+            currentExercise.secondaryMuscleGroups.contains(muscle));
+        
+        final secondaryInPrimary = currentPrimaryMuscles.any((muscle) => 
+            exercise.secondaryMuscleGroups.contains(muscle));
+        
+        return hasCommonPrimary || primaryInSecondary || secondaryInPrimary;
       }).toList();
     } catch (e) {
       debugPrint('Ошибка при получении альтернативных упражнений: $e');
@@ -397,10 +408,15 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
       
       if (currentExercise.id.isEmpty) return [];
       
-      // Ищем упражнения на ту же группу мышц
+      // Ищем упражнения на схожие группы мышц
       return _allExercises.where((exercise) {
-        return exercise.id != exerciseId &&
-            exercise.primaryMuscleGroup == currentExercise.primaryMuscleGroup;
+        if (exercise.id == exerciseId) return false;
+        
+        final currentPrimary = currentExercise.primaryMuscleGroups;
+        final exercisePrimary = exercise.primaryMuscleGroups;
+        
+        // Проверяем пересечение основных групп мышц
+        return currentPrimary.any((muscle) => exercisePrimary.contains(muscle));
       }).toList();
     } catch (e) {
       debugPrint('Ошибка при получении альтернативных упражнений: $e');
@@ -584,7 +600,7 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
     });
   }
 
-  // Получить общее количество подходов в плане
+  // Получить общее количество подходов в плана
   int getTotalSets() {
     return state.workouts.fold(0, (total, workout) {
       return total + workout.exercises.fold(0, (sum, exercise) => sum + exercise.sets);
@@ -638,7 +654,7 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
       // Обновляем тренировку
       final updatedWorkout = workout.copyWith(
         exercises: updatedExercises,
-        duration: workout.duration + 15, // Увеличиваем длительность на 15 минут
+        duration: workout.duration + 15,
       );
       
       // Обновляем список тренировок
@@ -671,7 +687,7 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
       // Обновляем тренировку
       final updatedWorkout = workout.copyWith(
         exercises: updatedExercises,
-        duration: workout.duration > 15 ? workout.duration - 15 : 30, // Уменьшаем длительность
+        duration: workout.duration > 15 ? workout.duration - 15 : 30,
       );
       
       // Обновляем список тренировок

@@ -24,8 +24,12 @@ class ExercisePreviewDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = ExerciseIconUtils.getMuscleGroupColor(exercise.primaryMuscleGroup);
-    final muscleGroupName = ExerciseIconUtils.getMuscleGroupName(exercise.primaryMuscleGroup);
+    // Используем первую группу мышц для получения цвета и названия
+    final primaryMuscle = exercise.primaryMuscleGroups.isNotEmpty 
+        ? exercise.primaryMuscleGroups.first 
+        : '';
+    final color = ExerciseIconUtils.getMuscleGroupColor(primaryMuscle);
+    final muscleGroupName = ExerciseIconUtils.getMuscleGroupName(primaryMuscle);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -49,7 +53,7 @@ class ExercisePreviewDialog extends StatelessWidget {
             // Анимированная иконка
             PulsingExerciseIcon(
               exerciseId: exercise.id,
-              muscleGroup: exercise.primaryMuscleGroup,
+              muscleGroup: primaryMuscle,
               size: 120,
               isActive: true,
               showBorder: true,
@@ -96,7 +100,7 @@ class ExercisePreviewDialog extends StatelessWidget {
             const SizedBox(height: 20),
             
             // Детали упражнения
-            if (exercise.description?.isNotEmpty ?? false)
+            if (exercise.description.isNotEmpty)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -105,7 +109,7 @@ class ExercisePreviewDialog extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  exercise.description!,
+                  exercise.description,
                   style: const TextStyle(
                     fontSize: 14,
                     color: Colors.black54,

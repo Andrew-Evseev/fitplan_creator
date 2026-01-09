@@ -8,6 +8,7 @@ import 'package:fitplan_creator/features/planner/presentation/widgets/exercise_s
 import 'package:fitplan_creator/features/planner/presentation/widgets/reorderable_exercise_list.dart';
 import 'package:fitplan_creator/data/models/workout_plan.dart';
 import 'package:fitplan_creator/data/models/workout_exercise.dart';
+import 'package:fitplan_creator/data/models/exercise.dart'; // ← ДОБАВЛЕН ИМПОРТ
 import 'package:fitplan_creator/data/repositories/workout_repository.dart';
 
 class PlannerScreen extends ConsumerStatefulWidget {
@@ -280,7 +281,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         children: [
           // Drag-and-drop список упражнений
           Container(
-            constraints: BoxConstraints(
+            constraints: const BoxConstraints(
               maxHeight: 400.0, // Ограничиваем максимальную высоту
             ),
             child: ReorderableExerciseList(
@@ -424,7 +425,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
       
       // Собираем статистику по группам мышц
       final exerciseDetails = repository.getExerciseById(exercise.exerciseId);
-      final primaryMuscleGroup = exerciseDetails.primaryMuscleGroup;
+      // ИСПРАВЛЕНИЕ: используем безопасный геттер
+      final primaryMuscleGroup = _getPrimaryMuscleGroup(exerciseDetails);
       if (primaryMuscleGroup.isNotEmpty) {
         muscleGroups[primaryMuscleGroup] = (muscleGroups[primaryMuscleGroup] ?? 0) + 1;
       }
@@ -444,6 +446,14 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  // Вспомогательный метод для безопасного получения группы мышц
+  String _getPrimaryMuscleGroup(Exercise exercise) {
+    if (exercise.primaryMuscleGroups.isNotEmpty) {
+      return exercise.primaryMuscleGroups.first;
+    }
+    return '';
   }
 
   // Сбросить выполнение тренировки
@@ -469,7 +479,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     // Получаем текущее упражнение для определения группы мышц
     final repository = WorkoutRepository();
     final currentExercise = repository.getExerciseById(currentExerciseId);
-    final currentMuscleGroup = currentExercise.primaryMuscleGroup;
+    // ИСПРАВЛЕНИЕ: используем безопасный геттер
+    final currentMuscleGroup = _getPrimaryMuscleGroup(currentExercise);
     
     showModalBottomSheet(
       context: context,
@@ -488,7 +499,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             ),
           );
         },
-        currentMuscleGroup: currentMuscleGroup,
+        currentMuscleGroup: currentMuscleGroup.isNotEmpty ? currentMuscleGroup : null,
       ),
     );
   }
@@ -619,9 +630,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
               
               const SizedBox(height: 16),
               
-              if (exerciseDetails.description?.isNotEmpty ?? false)
+              if (exerciseDetails.description.isNotEmpty)
                 Text(
-                  exerciseDetails.description!,
+                  exerciseDetails.description,
                   style: const TextStyle(
                     fontSize: 16,
                     color: Colors.grey,
@@ -650,7 +661,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
               
               const SizedBox(height: 20),
               
-              if (exerciseDetails.instructions?.isNotEmpty ?? false) ...[
+              if (exerciseDetails.instructions.isNotEmpty) ...[
                 const Text(
                   'Техника выполнения:',
                   style: TextStyle(
@@ -660,7 +671,7 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  exerciseDetails.instructions!,
+                  exerciseDetails.instructions,
                   style: const TextStyle(
                     fontSize: 14,
                     color: Colors.grey,
