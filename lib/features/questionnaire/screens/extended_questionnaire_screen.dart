@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:fitplan_creator/core/widgets/custom_button.dart';
 import 'package:fitplan_creator/core/widgets/loading_indicator.dart';
 import 'package:fitplan_creator/data/models/user_preferences.dart';
+import 'package:fitplan_creator/data/models/training_system.dart';
 import 'package:fitplan_creator/features/questionnaire/providers/questionnaire_provider.dart';
 import 'package:fitplan_creator/features/planner/providers/planner_provider.dart';
 
@@ -19,22 +20,35 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
   int _currentStep = 0;
   final PageController _pageController = PageController();
   final List<GlobalKey<FormState>> _formKeys = List.generate(7, (_) => GlobalKey<FormState>());
+  final _ageController = TextEditingController();
+  final _heightController = TextEditingController();
+  final _weightController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _initializeControllers();
+  }
+
+  void _initializeControllers() {
+    final prefs = ref.read(questionnaireProvider);
+    _ageController.text = prefs.age?.toString() ?? '';
+    _heightController.text = prefs.height?.toStringAsFixed(0) ?? '';
+    _weightController.text = prefs.weight?.toStringAsFixed(0) ?? '';
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _ageController.dispose();
+    _heightController.dispose();
+    _weightController.dispose();
     super.dispose();
   }
 
   void _nextStep() {
-    // Валидация текущего шага
-    if (_currentStep < 6) {
-      if (_validateCurrentStep()) {
+    if (_validateCurrentStep()) {
+      if (_currentStep < 6) {
         _pageController.nextPage(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
@@ -42,9 +56,9 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
         setState(() {
           _currentStep++;
         });
+      } else {
+        _generatePlan();
       }
-    } else {
-      _generatePlan();
     }
   }
 
@@ -57,95 +71,105 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
       setState(() {
         _currentStep--;
       });
+    } else {
+      context.go('/welcome');
     }
   }
 
   bool _validateCurrentStep() {
     switch (_currentStep) {
       case 0: // Основные данные
-        return _validateBasicInfoStep();
+        return _formKeys[0].currentState?.validate() ?? false;
       case 1: // Цель и активность
         return _validateGoalStep();
       case 2: // Уровень подготовки
         return _validateExperienceStep();
-      case 3: // Оборудование
+      case 3: // Место тренировок и оборудование
         return _validateEquipmentStep();
       case 4: // Ограничения по здоровью
         return true; // Необязательный шаг
       case 5: // Предпочтения
         return true; // Необязательный шаг
-      case 6: // График
+      case 6: // График и система
         return _validateScheduleStep();
       default:
         return false;
     }
   }
 
-  bool _validateBasicInfoStep() {
-    final prefs = ref.read(questionnaireProvider);
-    return prefs.gender != null &&
-        prefs.age != null &&
-        prefs.age! >= 10 &&
-        prefs.age! <= 100 &&
-        prefs.height != null &&
-        prefs.height! >= 100 &&
-        prefs.height! <= 250 &&
-        prefs.weight != null &&
-        prefs.weight! >= 30 &&
-        prefs.weight! <= 300;
-  }
-
   bool _validateGoalStep() {
     final prefs = ref.read(questionnaireProvider);
-    return prefs.goal != null && prefs.activityLevel != null;
+    if (prefs.goal == null) {
+      _showValidationError('Пожалуйста, выберите цель тренировок');
+      return false;
+    }
+    if (prefs.activityLevel == null) {
+      _showValidationError('Пожалуйста, выберите уровень активности');
+      return false;
+    }
+    return true;
   }
 
   bool _validateExperienceStep() {
     final prefs = ref.read(questionnaireProvider);
-    return prefs.experienceLevel != null && prefs.bodyType != null;
+    if (prefs.experienceLevel == null) {
+      _showValidationError('Пожалуйста, выберите уровень подготовки');
+      return false;
+    }
+    if (prefs.bodyType == null) {
+      _showValidationError('Пожалуйста, выберите тип телосложения');
+      return false;
+    }
+    return true;
   }
 
   bool _validateEquipmentStep() {
     final prefs = ref.read(questionnaireProvider);
-    return prefs.availableEquipment.isNotEmpty;
+    if (prefs.trainingLocation == null) {
+      _showValidationError('Пожалуйста, выберите место тренировок');
+      return false;
+    }
+    if (prefs.availableEquipment.isEmpty) {
+      _showValidationError('Пожалуйста, выберите хотя бы одно оборудование');
+      return false;
+    }
+    return true;
   }
 
   bool _validateScheduleStep() {
     final prefs = ref.read(questionnaireProvider);
-    return prefs.daysPerWeek != null && prefs.sessionDuration != null;
+    if (prefs.daysPerWeek == null) {
+      _showValidationError('Пожалуйста, выберите количество тренировок в неделю');
+      return false;
+    }
+    if (prefs.sessionDuration == null) {
+      _showValidationError('Пожалуйста, выберите длительность тренировки');
+      return false;
+    }
+    return true;
+  }
+
+  void _showValidationError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _generatePlan() async {
     final prefs = ref.read(questionnaireProvider);
     
-    // Проверяем только обязательные поля
-    final isComplete = prefs.gender != null &&
-        prefs.age != null &&
-        prefs.height != null &&
-        prefs.weight != null &&
-        prefs.goal != null &&
-        prefs.activityLevel != null &&
-        prefs.experienceLevel != null &&
-        prefs.availableEquipment.isNotEmpty &&
-        prefs.daysPerWeek != null &&
-        prefs.sessionDuration != null;
-    
-    if (!isComplete) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Пожалуйста, заполните все обязательные поля'),
-        ),
-      );
+    if (!prefs.isComplete) {
+      _showValidationError('Пожалуйста, заполните все обязательные поля');
       return;
     }
     
-    // Сохраняем контекст до асинхронных операций
-    final BuildContext currentContext = context;
-    
     // Показываем индикатор загрузки
     showDialog(
-      context: currentContext,
+      context: context,
       barrierDismissible: false,
       builder: (context) => const LoadingIndicator(message: 'Создаем ваш план...'),
     );
@@ -156,18 +180,13 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
       
       // Закрываем диалог и переходим
       if (mounted) {
-        Navigator.of(currentContext, rootNavigator: true).pop();
-        GoRouter.of(currentContext).go('/loading');
+        Navigator.of(context, rootNavigator: true).pop();
+        GoRouter.of(context).go('/loading');
       }
     } catch (e) {
       if (mounted) {
-        Navigator.of(currentContext, rootNavigator: true).pop();
-        ScaffoldMessenger.of(currentContext).showSnackBar(
-          SnackBar(
-            content: Text('Ошибка при создании плана: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        Navigator.of(context, rootNavigator: true).pop();
+        _showValidationError('Ошибка при создании плана: $e');
       }
     }
   }
@@ -179,14 +198,15 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
     return Form(
       key: _formKeys[0],
       child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 20),
             const Text(
-              'Основные данные',
+              '👤 Основные данные',
               style: TextStyle(
-                fontSize: 24,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -210,23 +230,26 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
             ),
             const SizedBox(height: 12),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 12,
+              runSpacing: 12,
               children: Gender.values.map((gender) {
                 final isSelected = prefs.gender == gender;
-                return FilterChip(
+                return ChoiceChip(
                   label: Text(gender.displayName),
                   selected: isSelected,
                   onSelected: (_) {
                     ref.read(questionnaireProvider.notifier).setGender(gender);
                   },
-                  selectedColor: Colors.blue[100],
-                  checkmarkColor: Colors.blue,
+                  selectedColor: Colors.blue,
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : Colors.grey[700],
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 );
               }).toList(),
             ),
             
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             
             // Возраст
             const Text(
@@ -238,13 +261,14 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
             ),
             const SizedBox(height: 12),
             TextFormField(
-              initialValue: prefs.age?.toString(),
+              controller: _ageController,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                hintText: 'Введите возраст (10-100)',
+                hintText: 'Введите возраст',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
+                prefixIcon: const Icon(Icons.cake),
               ),
               onChanged: (value) {
                 final age = int.tryParse(value);
@@ -263,7 +287,7 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
             
             const SizedBox(height: 24),
             
-            // Рост и вес в строке
+            // Рост и вес
             Row(
               children: [
                 Expanded(
@@ -279,13 +303,14 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
-                        initialValue: prefs.height?.toStringAsFixed(0),
+                        controller: _heightController,
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
                           hintText: '170',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
+                          prefixIcon: const Icon(Icons.height),
                         ),
                         onChanged: (value) {
                           final height = double.tryParse(value);
@@ -318,13 +343,14 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
-                        initialValue: prefs.weight?.toStringAsFixed(0),
+                        controller: _weightController,
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
                           hintText: '70',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
+                          prefixIcon: const Icon(Icons.monitor_weight),
                         ),
                         onChanged: (value) {
                           final weight = double.tryParse(value);
@@ -349,28 +375,42 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
             if (prefs.bmi != null && prefs.weight != null && prefs.height != null)
               Column(
                 children: [
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.grey[50],
+                      color: _getBMIColor(prefs.bmi!),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[300]!),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        const Text(
-                          'Информация:',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
+                        Icon(
+                          _getBMIIcon(prefs.bmi!),
+                          color: Colors.white,
+                          size: 40,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'ИМТ: ${prefs.bmi!.toStringAsFixed(1)}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                prefs.bmiCategory,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text('ИМТ: ${prefs.bmi!.toStringAsFixed(1)}'),
-                        Text('Рост: ${prefs.height!.toInt()} см'),
-                        Text('Вес: ${prefs.weight!.toInt()} кг'),
                       ],
                     ),
                   ),
@@ -382,25 +422,40 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
     );
   }
 
+  Color _getBMIColor(double bmi) {
+    if (bmi < 18.5) return Colors.blue;
+    if (bmi < 25) return Colors.green;
+    if (bmi < 30) return Colors.orange;
+    return Colors.red;
+  }
+
+  IconData _getBMIIcon(double bmi) {
+    if (bmi < 18.5) return Icons.warning;
+    if (bmi < 25) return Icons.check_circle;
+    if (bmi < 30) return Icons.warning_amber;
+    return Icons.error;
+  }
+
   // Шаг 2: Цель и активность
   Widget _buildGoalAndActivityStep() {
     final prefs = ref.watch(questionnaireProvider);
     
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 20),
           const Text(
-            'Цель и активность',
+            '🎯 Цель тренировок',
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Выберите свою основную цель и уровень ежедневной активности',
+            'Выберите свою основную цель',
             style: TextStyle(
               fontSize: 16,
               color: Colors.grey[600],
@@ -408,46 +463,49 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           ),
           const SizedBox(height: 32),
           
-          // Цель
-          const Text(
-            'Какова ваша основная цель?',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Column(
+          // Цели тренировок
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            childAspectRatio: 1.5,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
             children: UserGoal.values.map((goal) {
               final isSelected = prefs.goal == goal;
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                color: isSelected ? Colors.blue[50] : null,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: isSelected ? Colors.blue : Colors.grey[300]!,
-                    width: isSelected ? 2 : 1,
-                  ),
-                ),
-                child: ListTile(
-                  leading: Icon(
-                    _getGoalIcon(goal),
-                    color: isSelected ? Colors.blue : Colors.grey,
-                  ),
-                  title: Text(
-                    goal.displayName,
-                    style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected ? Colors.blue : Colors.black,
+              return GestureDetector(
+                onTap: () {
+                  ref.read(questionnaireProvider.notifier).setGoal(goal);
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.blue[50] : Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? Colors.blue : Colors.grey[300]!,
+                      width: isSelected ? 2 : 1,
                     ),
                   ),
-                  trailing: isSelected
-                      ? const Icon(Icons.check_circle, color: Colors.blue)
-                      : null,
-                  onTap: () {
-                    ref.read(questionnaireProvider.notifier).setGoal(goal);
-                  },
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _getGoalIcon(goal),
+                        color: isSelected ? Colors.blue : Colors.grey,
+                        size: 32,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        goal.displayName,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: isSelected ? Colors.blue : Colors.grey[700],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }).toList(),
@@ -457,13 +515,22 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           
           // Уровень активности
           const Text(
-            'Ваш уровень ежедневной активности',
+            '📊 Уровень ежедневной активности',
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          Text(
+            'Выберите уровень, соответствующий вашему образу жизни',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 32),
+          
           Column(
             children: ActivityLevel.values.map((level) {
               final isSelected = prefs.activityLevel == level;
@@ -485,10 +552,11 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
                   title: Text(
                     level.displayName,
                     style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: FontWeight.w600,
                       color: isSelected ? Colors.blue : Colors.black,
                     ),
                   ),
+                  subtitle: Text(level.description),
                   trailing: isSelected
                       ? const Icon(Icons.check_circle, color: Colors.blue)
                       : null,
@@ -499,60 +567,31 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
               );
             }).toList(),
           ),
-          
-          const SizedBox(height: 24),
-          
-          // Желаемый вес (опционально)
-          const Text(
-            'Желаемый вес (кг)',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            initialValue: prefs.targetWeight?.toStringAsFixed(0),
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              hintText: 'Оставьте пустым, если не знаете',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onChanged: (value) {
-              if (value.isNotEmpty) {
-                final targetWeight = double.tryParse(value);
-                if (targetWeight != null && targetWeight >= 30 && targetWeight <= 300) {
-                  ref.read(questionnaireProvider.notifier).setTargetWeight(targetWeight);
-                }
-              }
-            },
-          ),
         ],
       ),
     );
   }
 
-  // Шаг 3: Уровень подготовки
+  // Шаг 3: Уровень подготовки и телосложение
   Widget _buildExperienceStep() {
     final prefs = ref.watch(questionnaireProvider);
     
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 20),
           const Text(
-            'Уровень подготовки',
+            '🏆 Уровень подготовки',
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Оцените свой текущий уровень подготовки и тип телосложения',
+            'Оцените свой текущий уровень подготовки',
             style: TextStyle(
               fontSize: 16,
               color: Colors.grey[600],
@@ -561,14 +600,6 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           const SizedBox(height: 32),
           
           // Уровень опыта
-          const Text(
-            'Ваш уровень опыта в тренировках',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 12),
           Column(
             children: ExperienceLevel.values.map((level) {
               final isSelected = prefs.experienceLevel == level;
@@ -603,7 +634,7 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
                   title: Text(
                     level.displayName,
                     style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: FontWeight.w600,
                       color: isSelected ? Colors.blue : Colors.black,
                     ),
                   ),
@@ -623,44 +654,74 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           
           // Тип телосложения
           const Text(
-            'Тип телосложения',
+            '📏 Тип телосложения',
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 12),
-          Column(
+          const SizedBox(height: 8),
+          Text(
+            'Выберите тип, наиболее соответствующий вашему телу',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 32),
+          
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 3,
+            childAspectRatio: 0.8,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
             children: BodyType.values.map((type) {
               final isSelected = prefs.bodyType == type;
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                color: isSelected ? Colors.blue[50] : null,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: isSelected ? Colors.blue : Colors.grey[300]!,
-                    width: isSelected ? 2 : 1,
-                  ),
-                ),
-                child: ListTile(
-                  leading: Icon(
-                    _getBodyTypeIcon(type),
-                    color: isSelected ? Colors.blue : Colors.grey,
-                  ),
-                  title: Text(
-                    type.displayName,
-                    style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected ? Colors.blue : Colors.black,
+              return GestureDetector(
+                onTap: () {
+                  ref.read(questionnaireProvider.notifier).setBodyType(type);
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.blue[50] : Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? Colors.blue : Colors.grey[300]!,
+                      width: isSelected ? 2 : 1,
                     ),
                   ),
-                  trailing: isSelected
-                      ? const Icon(Icons.check_circle, color: Colors.blue)
-                      : null,
-                  onTap: () {
-                    ref.read(questionnaireProvider.notifier).setBodyType(type);
-                  },
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _getBodyTypeIcon(type),
+                        color: isSelected ? Colors.blue : Colors.grey,
+                        size: 32,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        type.displayName,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                          color: isSelected ? Colors.blue : Colors.grey[700],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        type.description,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }).toList(),
@@ -670,26 +731,27 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
     );
   }
 
-  // Шаг 4: Оборудование
+  // Шаг 4: Место тренировок и оборудование (ИНТЕЛЛЕКТУАЛЬНЫЙ ВЫБОР)
   Widget _buildEquipmentStep() {
     final prefs = ref.watch(questionnaireProvider);
-    final selectedEquipment = prefs.availableEquipment;
+    final selectedLocation = prefs.trainingLocation;
 
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 20),
           const Text(
-            'Оборудование',
+            '🏢 Место тренировок',
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Какое оборудование у вас есть для тренировок?',
+            'Выберите, где вы планируете тренироваться',
             style: TextStyle(
               fontSize: 16,
               color: Colors.grey[600],
@@ -697,57 +759,193 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           ),
           const SizedBox(height: 32),
           
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: Equipment.values.map((equipment) {
-              final isSelected = selectedEquipment.contains(equipment);
-              return FilterChip(
-                label: Text(equipment.displayName),
-                selected: isSelected,
-                onSelected: (_) {
-                  ref.read(questionnaireProvider.notifier).toggleEquipment(equipment);
+          // Выбор места тренировок
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            childAspectRatio: 1.5,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            children: TrainingLocation.values.map((location) {
+              final isSelected = selectedLocation == location;
+              return GestureDetector(
+                onTap: () {
+                  ref.read(questionnaireProvider.notifier).setTrainingLocation(location);
                 },
-                selectedColor: Colors.blue[100],
-                checkmarkColor: Colors.blue,
-                labelStyle: TextStyle(
-                  color: isSelected ? Colors.blue : Colors.grey[700],
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isSelected ? _getLocationColor(location) : Colors.grey[50],
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected ? _getLocationColor(location) : Colors.grey[300]!,
+                      width: isSelected ? 3 : 1,
+                    ),
+                    boxShadow: isSelected ? [
+                      BoxShadow(
+                        color: _getLocationColor(location).withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ] : null,
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        location.displayName,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isSelected ? Colors.white : Colors.grey[800],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Icon(
+                        _getLocationIcon(location),
+                        color: isSelected ? Colors.white : _getLocationColor(location),
+                        size: 32,
+                      ),
+                      if (isSelected) ...[
+                        const SizedBox(height: 12),
+                        const Icon(
+                          Icons.check_circle,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-                avatar: isSelected
-                    ? const Icon(Icons.check, size: 18, color: Colors.blue)
-                    : null,
               );
             }).toList(),
           ),
           
-          const SizedBox(height: 16),
-          if (selectedEquipment.contains(Equipment.none))
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info, color: Colors.orange[700]),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Выбрано "Без оборудования". Будут предложены только упражнения с собственным весом.',
-                      style: TextStyle(
-                        color: Colors.orange[800],
-                        fontSize: 14,
-                      ),
-                    ),
+          const SizedBox(height: 32),
+          
+          // Выбор оборудования в зависимости от места
+          if (selectedLocation != null)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _getEquipmentTitle(selectedLocation),
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _getEquipmentDescription(selectedLocation),
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Оборудование для выбранной локации
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: UserPreferences.getEquipmentByLocation(selectedLocation).map((equipment) {
+                    final isSelected = prefs.availableEquipment.contains(equipment);
+                    return FilterChip(
+                      label: Text(equipment.displayName),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        if (selected) {
+                          ref.read(questionnaireProvider.notifier).toggleEquipment(equipment);
+                        } else {
+                          ref.read(questionnaireProvider.notifier).toggleEquipment(equipment);
+                        }
+                      },
+                      selectedColor: _getLocationColor(selectedLocation!),
+                      checkmarkColor: Colors.white,
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : Colors.grey[700],
+                      ),
+                      avatar: isSelected
+                          ? const Icon(Icons.check, size: 16, color: Colors.white)
+                          : null,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    );
+                  }).toList(),
+                ),
+                
+                if (selectedLocation == TrainingLocation.home)
+                  Column(
+                    children: [
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Другое оборудование:',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        decoration: InputDecoration(
+                          hintText: 'Введите другое оборудование, которое у вас есть',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          prefixIcon: const Icon(Icons.add),
+                        ),
+                        onChanged: (value) {
+                          // Можно добавить логику для сохранения текстового поля
+                        },
+                      ),
+                    ],
+                  ),
+              ],
             ),
         ],
       ),
     );
+  }
+
+  Color _getLocationColor(TrainingLocation location) {
+    switch (location) {
+      case TrainingLocation.gym:
+        return Colors.blue;
+      case TrainingLocation.home:
+        return Colors.green;
+      case TrainingLocation.street:
+        return Colors.orange;
+      case TrainingLocation.bodyweight:
+        return Colors.purple;
+    }
+  }
+
+  String _getEquipmentTitle(TrainingLocation location) {
+    switch (location) {
+      case TrainingLocation.gym:
+        return '🏋️ Оборудование в зале';
+      case TrainingLocation.home:
+        return '🏠 Домашнее оборудование';
+      case TrainingLocation.street:
+        return '🌳 Уличное оборудование';
+      case TrainingLocation.bodyweight:
+        return '💪 Только с весом тела';
+    }
+  }
+
+  String _getEquipmentDescription(TrainingLocation location) {
+    switch (location) {
+      case TrainingLocation.gym:
+        return 'Выберите оборудование, которое есть в вашем зале';
+      case TrainingLocation.home:
+        return 'Выберите оборудование, которое у вас есть дома';
+      case TrainingLocation.street:
+        return 'Выберите оборудование на вашей площадке';
+      case TrainingLocation.bodyweight:
+        return 'Тренировки с использованием только веса тела';
+    }
   }
 
   // Шаг 5: Ограничения по здоровью
@@ -756,14 +954,15 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
     final selectedRestrictions = prefs.healthRestrictions;
 
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 20),
           const Text(
-            'Ограничения по здоровью',
+            '🏥 Ограничения по здоровью',
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -777,84 +976,134 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           ),
           const SizedBox(height: 32),
           
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: HealthRestriction.values.map((restriction) {
+          // Основные ограничения
+          const Text(
+            'Основные ограничения:',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            childAspectRatio: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            children: HealthRestriction.values
+                .where((r) => r != HealthRestriction.none)
+                .map((restriction) {
               final isSelected = selectedRestrictions.contains(restriction);
-              return FilterChip(
-                label: Text(restriction.displayName),
-                selected: isSelected,
-                onSelected: (_) {
+              return GestureDetector(
+                onTap: () {
                   ref.read(questionnaireProvider.notifier).toggleHealthRestriction(restriction);
                 },
-                selectedColor: isSelected && restriction != HealthRestriction.none 
-                    ? Colors.orange[100] 
-                    : Colors.blue[100],
-                checkmarkColor: isSelected && restriction != HealthRestriction.none 
-                    ? Colors.orange 
-                    : Colors.blue,
-                labelStyle: TextStyle(
-                  color: isSelected 
-                      ? (restriction != HealthRestriction.none ? Colors.orange : Colors.blue)
-                      : Colors.grey[700],
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.orange[50] : Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? Colors.orange : Colors.grey[300]!,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isSelected ? Icons.check_box : Icons.check_box_outline_blank,
+                        color: isSelected ? Colors.orange : Colors.grey,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          restriction.displayName,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: isSelected ? Colors.orange[800] : Colors.grey[700],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                avatar: isSelected
-                    ? Icon(Icons.check, size: 18, 
-                        color: restriction != HealthRestriction.none ? Colors.orange : Colors.blue)
-                    : null,
               );
             }).toList(),
           ),
           
-          const SizedBox(height: 16),
-          if (selectedRestrictions.contains(HealthRestriction.none))
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green[200]!),
+          const SizedBox(height: 32),
+          
+          // Кнопка "Нет ограничений"
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () {
+                ref.read(questionnaireProvider.notifier).toggleHealthRestriction(HealthRestriction.none);
+              },
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                side: BorderSide(
+                  color: selectedRestrictions.contains(HealthRestriction.none)
+                      ? Colors.green
+                      : Colors.grey,
+                  width: 2,
+                ),
               ),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.check_circle, color: Colors.green[700]),
+                  Icon(
+                    selectedRestrictions.contains(HealthRestriction.none)
+                        ? Icons.check_circle
+                        : Icons.circle_outlined,
+                    color: selectedRestrictions.contains(HealthRestriction.none)
+                        ? Colors.green
+                        : Colors.grey,
+                  ),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Ограничений по здоровью нет. Будут доступны все упражнения.',
-                      style: TextStyle(
-                        color: Colors.green[800],
-                        fontSize: 14,
-                      ),
+                  Text(
+                    'Нет ограничений по здоровью',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: selectedRestrictions.contains(HealthRestriction.none)
+                          ? Colors.green
+                          : Colors.grey,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
             ),
-          if (selectedRestrictions.isNotEmpty && !selectedRestrictions.contains(HealthRestriction.none))
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.medical_services, color: Colors.orange[700]),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Упражнения, которые могут навредить указанным суставам/мышцам, будут исключены.',
-                      style: TextStyle(
-                        color: Colors.orange[800],
-                        fontSize: 14,
-                      ),
-                    ),
+          ),
+          
+          if (selectedRestrictions.contains(HealthRestriction.none))
+            Column(
+              children: [
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.green[200]!),
                   ),
-                ],
-              ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Отлично! У вас нет ограничений по здоровью. Все упражнения будут доступны.',
+                          style: TextStyle(color: Colors.green),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
         ],
       ),
@@ -868,18 +1117,20 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
     // Группы мышц для выбора
     final muscleGroups = [
       'Грудь', 'Спина', 'Плечи', 'Бицепс', 'Трицепс', 
-      'Ноги', 'Ягодицы', 'Пресс', 'Кардио'
+      'Ноги', 'Ягодицы', 'Пресс', 'Кардио', 'Вся верхняя часть',
+      'Вся нижняя часть', 'Корпус', 'Руки', 'Задняя поверхность бедра'
     ];
 
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 20),
           const Text(
-            'Предпочтения',
+            '⭐ Предпочтения',
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -895,13 +1146,22 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           
           // Любимые группы мышц
           const Text(
-            'Любимые группы мышц (можно выбрать несколько)',
+            '💪 Любимые группы мышц',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 22,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          Text(
+            'Выберите группы мышц, которые вы хотите развивать в первую очередь',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 16),
+          
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -917,50 +1177,53 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
                     ref.read(questionnaireProvider.notifier).addFavoriteMuscleGroup(muscleGroup);
                   }
                 },
-                selectedColor: Colors.green[100],
-                checkmarkColor: Colors.green,
+                selectedColor: Colors.blue,
+                checkmarkColor: Colors.white,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : Colors.grey[700],
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               );
             }).toList(),
           ),
           
           const SizedBox(height: 32),
           
-          // Нелюбимые упражнения (текстовое поле)
+          // Нелюбимые упражнения
           const Text(
-            'Нелюбимые упражнения',
+            '❌ Нелюбимые упражнения',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 22,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
-            'Введите названия упражнений, которые вы не хотите видеть в плане (через запятую)',
+            'Введите названия упражнений, которые вы не хотите видеть в плане',
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[600],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
+          
           TextFormField(
-            initialValue: prefs.dislikedExercises.join(', '),
+            maxLines: 3,
             decoration: InputDecoration(
-              hintText: 'Например: берпи, планка, выпады',
+              hintText: 'Например: берпи, планка, выпады, скручивания...',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
+              filled: true,
+              fillColor: Colors.grey[50],
             ),
             onChanged: (value) {
-              // Создаем новый список упражнений из ввода
               final exercises = value.split(',')
                 .map((e) => e.trim())
                 .where((e) => e.isNotEmpty)
                 .toList();
               
-              // Сначала очищаем старый список
               ref.read(questionnaireProvider.notifier).clearDislikedExercises();
-              
-              // Затем добавляем новые упражнения
               for (final exercise in exercises) {
                 ref.read(questionnaireProvider.notifier).addDislikedExercise(exercise);
               }
@@ -968,48 +1231,33 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           ),
           
           const SizedBox(height: 16),
-          if (prefs.favoriteMuscleGroups.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.favorite, color: Colors.green[700]),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Вы выбрали любимые группы мышц: ${prefs.favoriteMuscleGroups.join(', ')}',
-                      style: TextStyle(
-                        color: Colors.green[800],
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          Text(
+            'Разделяйте упражнения запятыми',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[500],
             ),
+          ),
         ],
       ),
     );
   }
 
-  // Шаг 7: График
+  // Шаг 7: График и система тренировок
   Widget _buildScheduleStep() {
     final prefs = ref.watch(questionnaireProvider);
+    final recommendedSystem = prefs.recommendedSystem;
     
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 20),
           const Text(
-            'График тренировок',
+            '📅 График тренировок',
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -1027,53 +1275,55 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           const Text(
             'Сколько дней в неделю вы готовы тренироваться?',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [2, 3, 4, 5, 6].map((days) {
+          
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 4,
+            childAspectRatio: 1,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            children: [2, 3, 4, 5, 6, 7].map((days) {
               final isSelected = prefs.daysPerWeek == days;
-              return Column(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      ref.read(questionnaireProvider.notifier).setDaysPerWeek(days);
-                    },
-                    child: Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isSelected ? Colors.blue : Colors.grey[200],
-                        border: Border.all(
-                          color: isSelected ? Colors.blue : Colors.transparent,
-                          width: 2,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '$days',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? Colors.white : Colors.grey[700],
-                          ),
-                        ),
-                      ),
+              return GestureDetector(
+                onTap: () {
+                  ref.read(questionnaireProvider.notifier).setDaysPerWeek(days);
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.blue : Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? Colors.blue : Colors.grey[300]!,
+                      width: isSelected ? 3 : 1,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '$days дней',
-                    style: TextStyle(
-                      color: isSelected ? Colors.blue : Colors.grey[600],
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '$days',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: isSelected ? Colors.white : Colors.grey[700],
+                        ),
+                      ),
+                      Text(
+                        'дней',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isSelected ? Colors.white : Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               );
             }).toList(),
           ),
@@ -1084,46 +1334,131 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           const Text(
             'Сколько времени вы готовы уделять каждой тренировке?',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 3,
+            childAspectRatio: 1.2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
             children: [
-              _buildDurationOption(prefs, 30, '30 мин'),
-              _buildDurationOption(prefs, 45, '45 мин'),
-              _buildDurationOption(prefs, 60, '60 мин'),
-              _buildDurationOption(prefs, 90, '90 мин'),
+              _buildDurationOption(prefs, 30, '30 мин', Icons.timer),
+              _buildDurationOption(prefs, 45, '45 мин', Icons.timer),
+              _buildDurationOption(prefs, 60, '60 мин', Icons.timer),
+              _buildDurationOption(prefs, 75, '75 мин', Icons.timer),
+              _buildDurationOption(prefs, 90, '90 мин', Icons.timer),
             ],
           ),
           
           const SizedBox(height: 32),
           
+          // Рекомендуемая система тренировок
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.blue[200]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '🎯 Рекомендуемая система тренировок',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  recommendedSystem.displayName,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  recommendedSystem.description,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Аудитория: ${recommendedSystem.audience}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          
           // Резюме выбора
           if (prefs.daysPerWeek != null && prefs.sessionDuration != null)
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue[200]!),
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.green[200]!),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Ваш график тренировок:',
+                    '📋 Ваш график тренировок:',
                     style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today, color: Colors.green),
+                      const SizedBox(width: 12),
+                      Text(
+                        '${prefs.daysPerWeek} дней в неделю',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 8),
-                  Text('• ${prefs.daysPerWeek} дней в неделю'),
-                  Text('• ${prefs.sessionDuration} минут на тренировку'),
-                  Text('• Общее время в неделю: ${prefs.daysPerWeek! * prefs.sessionDuration!} минут'),
+                  Row(
+                    children: [
+                      const Icon(Icons.timer, color: Colors.green),
+                      const SizedBox(width: 12),
+                      Text(
+                        '${prefs.sessionDuration} минут на тренировку',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.access_time, color: Colors.green),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Всего: ${prefs.daysPerWeek! * prefs.sessionDuration!} минут в неделю',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -1132,46 +1467,42 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
     );
   }
 
-  Widget _buildDurationOption(UserPreferences prefs, int minutes, String label) {
+  Widget _buildDurationOption(UserPreferences prefs, int minutes, String label, IconData icon) {
     final isSelected = prefs.sessionDuration == minutes;
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () {
-            ref.read(questionnaireProvider.notifier).setSessionDuration(minutes);
-          },
-          child: Container(
-            width: 80,
-            height: 60,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: isSelected ? Colors.blue : Colors.grey[200],
-              border: Border.all(
-                color: isSelected ? Colors.blue : Colors.transparent,
-                width: 2,
-              ),
-            ),
-            child: Center(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.white : Colors.grey[700],
-                ),
-              ),
-            ),
+    return GestureDetector(
+      onTap: () {
+        ref.read(questionnaireProvider.notifier).setSessionDuration(minutes);
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blue : Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? Colors.blue : Colors.grey[300]!,
+            width: isSelected ? 3 : 1,
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.blue : Colors.grey[600],
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? Colors.white : Colors.grey[700],
+              size: 24,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? Colors.white : Colors.grey[700],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -1195,7 +1526,7 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
   IconData _getBodyTypeIcon(BodyType type) {
     switch (type) {
       case BodyType.ectomorph:
-        return Icons.linear_scale;
+        return Icons.straighten;
       case BodyType.mesomorph:
         return Icons.fitness_center;
       case BodyType.endomorph:
@@ -1203,70 +1534,96 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
     }
   }
 
+  // Иконки для мест тренировок
+  IconData _getLocationIcon(TrainingLocation location) {
+    switch (location) {
+      case TrainingLocation.gym:
+        return Icons.fitness_center;
+      case TrainingLocation.home:
+        return Icons.home;
+      case TrainingLocation.street:
+        return Icons.park;
+      case TrainingLocation.bodyweight:
+        return Icons.self_improvement;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final prefs = ref.watch(questionnaireProvider);
+    final progress = (_currentStep + 1) / 7;
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Расширенная анкета'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (_currentStep > 0) {
-              _previousStep();
-            } else {
-              context.go('/welcome');
-            }
-          },
+          onPressed: _previousStep,
         ),
+        actions: [
+          if (prefs.isComplete)
+            IconButton(
+              icon: const Icon(Icons.check_circle, color: Colors.green),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Все обязательные поля заполнены!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+              tooltip: 'Все поля заполнены',
+            ),
+        ],
       ),
       body: SafeArea(
         child: Column(
           children: [
             // Индикатор прогресса
-            Padding(
+            Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(7, (index) {
-                  return Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 2),
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: index <= _currentStep ? Colors.blue : Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              color: Colors.grey[50],
+              child: Column(
                 children: [
-                  Text(
-                    'Шаг ${_currentStep + 1} из 7',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Шаг ${_currentStep + 1} из 7',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      Text(
+                        '${(progress * 100).toInt()}%',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: progress,
+                    backgroundColor: Colors.grey[300],
+                    color: Colors.blue,
+                    minHeight: 8,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  const SizedBox(height: 4),
                   Text(
-                    '${((_currentStep + 1) / 7 * 100).toInt()}%',
+                    _getStepTitle(_currentStep),
                     style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue,
+                      fontSize: 12,
+                      color: Colors.grey,
                     ),
                   ),
                 ],
               ),
             ),
-            
-            const SizedBox(height: 8),
             
             // Контент анкеты
             Expanded(
@@ -1286,14 +1643,21 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
             ),
             
             // Кнопки навигации
-            Padding(
-              padding: const EdgeInsets.all(20.0),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: Colors.grey[200]!)),
+              ),
               child: Row(
                 children: [
                   if (_currentStep > 0)
                     Expanded(
                       child: OutlinedButton(
                         onPressed: _previousStep,
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
                         child: const Text('Назад'),
                       ),
                     ),
@@ -1302,6 +1666,7 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
                     child: CustomButton(
                       text: _currentStep == 6 ? 'Создать план' : 'Далее',
                       onPressed: _nextStep,
+                      icon: _currentStep == 6 ? Icons.done_all : Icons.arrow_forward,
                     ),
                   ),
                 ],
@@ -1311,5 +1676,26 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
         ),
       ),
     );
+  }
+
+  String _getStepTitle(int step) {
+    switch (step) {
+      case 0:
+        return 'Основные данные';
+      case 1:
+        return 'Цель тренировок';
+      case 2:
+        return 'Уровень подготовки';
+      case 3:
+        return 'Место и оборудование';
+      case 4:
+        return 'Ограничения по здоровью';
+      case 5:
+        return 'Предпочтения';
+      case 6:
+        return 'График тренировок';
+      default:
+        return '';
+    }
   }
 }

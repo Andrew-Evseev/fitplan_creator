@@ -5,39 +5,7 @@ import 'package:fitplan_creator/data/models/user_preferences.dart';
 class QuestionnaireNotifier extends StateNotifier<UserPreferences> {
   QuestionnaireNotifier() : super(const UserPreferences());
 
-  void setGoal(UserGoal goal) {
-    state = state.copyWith(goal: goal);
-  }
-
-  void setExperienceLevel(ExperienceLevel level) {
-    state = state.copyWith(experienceLevel: level);
-  }
-
-  void toggleEquipment(Equipment equipment) {
-    final List<Equipment> newEquipment;
-    if (state.availableEquipment.contains(equipment)) {
-      newEquipment = List.from(state.availableEquipment)..remove(equipment);
-    } else {
-      if (equipment == Equipment.none) {
-        newEquipment = [equipment];
-      } else {
-        newEquipment = List.from(state.availableEquipment)
-          ..remove(Equipment.none)
-          ..add(equipment);
-      }
-    }
-    state = state.copyWith(availableEquipment: newEquipment);
-  }
-
-  void setDaysPerWeek(int days) {
-    state = state.copyWith(daysPerWeek: days);
-  }
-
-  void setSessionDuration(int minutes) {
-    state = state.copyWith(sessionDuration: minutes);
-  }
-
-  // НОВЫЕ МЕТОДЫ ДЛЯ РАСШИРЕННОЙ АНКЕТЫ
+  // ==================== БАЗОВЫЕ ДАННЫЕ ====================
   void setGender(Gender gender) {
     state = state.copyWith(gender: gender);
   }
@@ -58,30 +26,69 @@ class QuestionnaireNotifier extends StateNotifier<UserPreferences> {
     state = state.copyWith(targetWeight: targetWeight);
   }
 
+  // ==================== ЦЕЛИ И АКТИВНОСТЬ ====================
+  void setGoal(UserGoal goal) {
+    state = state.copyWith(goal: goal);
+  }
+
   void setActivityLevel(ActivityLevel level) {
     state = state.copyWith(activityLevel: level);
+  }
+
+  // ==================== ОПЫТ И ТЕЛОСЛОЖЕНИЕ ====================
+  void setExperienceLevel(ExperienceLevel level) {
+    state = state.copyWith(experienceLevel: level);
   }
 
   void setBodyType(BodyType bodyType) {
     state = state.copyWith(bodyType: bodyType);
   }
 
+  // ==================== МЕСТО ТРЕНИРОВОК И ОБОРУДОВАНИЕ ====================
+  void setTrainingLocation(TrainingLocation location) {
+    // При выборе места тренировок автоматически добавляем соответствующее оборудование
+    final equipment = UserPreferences.getEquipmentByLocation(location);
+    
+    state = state.copyWith(
+      trainingLocation: location,
+      availableEquipment: equipment,
+    );
+  }
+
+  void toggleEquipment(Equipment equipment) {
+    final List<Equipment> newEquipment;
+    if (state.availableEquipment.contains(equipment)) {
+      newEquipment = List.from(state.availableEquipment)..remove(equipment);
+    } else {
+      newEquipment = List.from(state.availableEquipment)..add(equipment);
+    }
+    state = state.copyWith(availableEquipment: newEquipment);
+  }
+
+  // Добавить несколько единиц оборудования
+  void addMultipleEquipment(List<Equipment> equipmentList) {
+    final newEquipment = List<Equipment>.from(state.availableEquipment)
+      ..addAll(equipmentList.where((e) => !state.availableEquipment.contains(e)));
+    state = state.copyWith(availableEquipment: newEquipment);
+  }
+
+  // Удалить все оборудование
+  void clearEquipment() {
+    state = state.copyWith(availableEquipment: const []);
+  }
+
+  // ==================== ОГРАНИЧЕНИЯ ПО ЗДОРОВЬЮ ====================
   void toggleHealthRestriction(HealthRestriction restriction) {
     final List<HealthRestriction> newRestrictions;
     if (state.healthRestrictions.contains(restriction)) {
       newRestrictions = List.from(state.healthRestrictions)..remove(restriction);
     } else {
-      if (restriction == HealthRestriction.none) {
-        newRestrictions = [restriction];
-      } else {
-        newRestrictions = List.from(state.healthRestrictions)
-          ..remove(HealthRestriction.none)
-          ..add(restriction);
-      }
+      newRestrictions = List.from(state.healthRestrictions)..add(restriction);
     }
     state = state.copyWith(healthRestrictions: newRestrictions);
   }
 
+  // ==================== ПРЕДПОЧТЕНИЯ ====================
   void addFavoriteMuscleGroup(String muscleGroup) {
     final newFavorites = List<String>.from(state.favoriteMuscleGroups)
       ..add(muscleGroup);
@@ -106,22 +113,34 @@ class QuestionnaireNotifier extends StateNotifier<UserPreferences> {
     state = state.copyWith(dislikedExercises: newDisliked);
   }
 
-  // Новый метод для очистки всех нелюбимых упражнений
+  // ==================== ГРАФИК ТРЕНИРОВОК ====================
+  void setDaysPerWeek(int days) {
+    state = state.copyWith(daysPerWeek: days);
+  }
+
+  void setSessionDuration(int minutes) {
+    state = state.copyWith(sessionDuration: minutes);
+  }
+
+  // ==================== СИСТЕМА ТРЕНИРОВОК ====================
+  void setPreferredSystem(TrainingSystem system) {
+    state = state.copyWith(preferredSystem: system);
+  }
+
+  // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
   void clearDislikedExercises() {
     state = state.copyWith(dislikedExercises: const []);
   }
 
-  // Новый метод для очистки всех любимых групп мышц
   void clearFavoriteMuscleGroups() {
     state = state.copyWith(favoriteMuscleGroups: const []);
   }
 
-  // Новый метод для сброса всех настроек анкеты
   void resetQuestionnaire() {
     state = const UserPreferences();
   }
 
-  // Новый метод для проверки, заполнены ли все обязательные поля
+  // Проверка заполнения обязательных полей
   bool areMandatoryFieldsFilled() {
     return state.gender != null &&
         state.age != null &&
@@ -130,12 +149,13 @@ class QuestionnaireNotifier extends StateNotifier<UserPreferences> {
         state.goal != null &&
         state.activityLevel != null &&
         state.experienceLevel != null &&
+        state.trainingLocation != null &&
         state.availableEquipment.isNotEmpty &&
         state.daysPerWeek != null &&
         state.sessionDuration != null;
   }
 
-  // Новый метод для получения статистики анкеты
+  // Получить статистику анкеты
   Map<String, dynamic> getQuestionnaireStats() {
     return {
       'bmi': state.bmi,
@@ -144,14 +164,33 @@ class QuestionnaireNotifier extends StateNotifier<UserPreferences> {
       'dailyCalories': state.dailyCalories,
       'recommendedProtein': state.recommendedDailyProtein,
       'recommendedWater': state.recommendedDailyWater,
+      'recommendedSystem': state.recommendedSystem.displayName,
       'filledFields': {
         'basic': state.gender != null && state.age != null && state.height != null && state.weight != null,
         'goal': state.goal != null && state.activityLevel != null,
         'experience': state.experienceLevel != null && state.bodyType != null,
+        'location': state.trainingLocation != null,
         'equipment': state.availableEquipment.isNotEmpty,
         'schedule': state.daysPerWeek != null && state.sessionDuration != null,
       },
+      'recommendations': state.recommendations,
     };
+  }
+
+  // Получить рекомендуемую систему тренировок
+  TrainingSystem getRecommendedTrainingSystem() {
+    return state.recommendedSystem;
+  }
+
+  // Получить оборудование для выбранного места тренировок
+  List<Equipment> getEquipmentForSelectedLocation() {
+    if (state.trainingLocation == null) return [];
+    return UserPreferences.getEquipmentByLocation(state.trainingLocation!);
+  }
+
+  // Проверить, выбрано ли конкретное оборудование
+  bool isEquipmentSelected(Equipment equipment) {
+    return state.availableEquipment.contains(equipment);
   }
 
   void reset() {
