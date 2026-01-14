@@ -1,16 +1,23 @@
+// lib/features/planner/providers/planner_provider.dart
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitplan_creator/data/models/exercise.dart';
 import 'package:fitplan_creator/data/models/user_preferences.dart';
 import 'package:fitplan_creator/data/models/workout_plan.dart';
-import 'package:fitplan_creator/data/models/workout_template.dart';
 import 'package:fitplan_creator/data/models/workout_exercise.dart';
+import 'package:fitplan_creator/data/models/training_system.dart';
 import 'package:fitplan_creator/data/repositories/workout_repository.dart';
+import 'package:fitplan_creator/data/repositories/training_system_repository.dart';
+import 'package:fitplan_creator/features/planner/algorithms/plan_generator.dart';
+import 'package:fitplan_creator/core/analytics/analytics_service.dart';
 
 class PlannerNotifier extends StateNotifier<WorkoutPlan> {
-  PlannerNotifier(this.workoutRepository)
-      : _allExercises = workoutRepository.allExercises,
+  PlannerNotifier(
+    this.workoutRepository,
+    this.systemRepository,
+    this.planGenerator,
+  ) : _allExercises = workoutRepository.allExercises,
         super(WorkoutPlan(
           id: 'temp',
           userId: 'temp',
@@ -24,11 +31,13 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
   }
 
   final WorkoutRepository workoutRepository;
+  final TrainingSystemRepository systemRepository;
+  final PlanGenerator planGenerator;
   final List<Exercise> _allExercises;
+  final AnalyticsService _analytics = AnalyticsService();
 
   Future<void> _initialize() async {
     try {
-      // Если нет предпочтений пользователя, создаем план по умолчанию
       if (state.userPreferences == null) {
         await _generateDefaultPlan();
       }
@@ -40,217 +49,187 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
   // Установка предпочтений пользователя и генерация плана
   Future<void> setUserPreferences(UserPreferences prefs) async {
     try {
-      // Генерируем план на основе предпочтений
-      await _generatePlanFromPreferences(prefs);
-    } catch (e) {
-      debugPrint('Ошибка при установке предпочтений: $e');
-    }
-  }
-
-  // Генерация плана по умолчанию
-  Future<void> _generateDefaultPlan() async {
-    try {
-      // Используем реальные упражнения для дефолтного плана
-      final day1Exercises = [
-        WorkoutExercise(exerciseId: 'chest_01', sets: 3, reps: 10),
-        WorkoutExercise(exerciseId: 'legs_01', sets: 3, reps: 12),
-        WorkoutExercise(exerciseId: 'abs_02', sets: 3, reps: 30),
-      ];
+      final stopwatch = Stopwatch()..start();
       
-      final day2Exercises = [
-        WorkoutExercise(exerciseId: 'back_01', sets: 3, reps: 8),
-        WorkoutExercise(exerciseId: 'arms_01', sets: 3, reps: 12),
-        WorkoutExercise(exerciseId: 'abs_02', sets: 3, reps: 30),
-      ];
-
-      final workouts = [
-        Workout(
-          id: 'day1',
-          name: 'День 1: Верх тела + Ноги',
-          dayOfWeek: 1,
-          exercises: day1Exercises,
-          duration: 45,
-          completed: false,
-        ),
-        Workout(
-          id: 'day2',
-          name: 'День 2: Спина + Руки',
-          dayOfWeek: 3,
-          exercises: day2Exercises,
-          duration: 45,
-          completed: false,
-        ),
-      ];
-
-      state = WorkoutPlan(
-        id: 'default_plan',
-        userId: 'default_user',
-        name: 'Стандартный план',
-        description: 'Базовый план для новичков',
-        workouts: workouts,
-        createdAt: DateTime.now(),
-        userPreferences: UserPreferences(
-          goal: UserGoal.generalFitness,
-          experienceLevel: ExperienceLevel.beginner,
-          availableEquipment: [Equipment.none],
-          daysPerWeek: 2,
-          sessionDuration: 45,
-        ),
+      // Используем интеллектуальный генератор планов
+      final plan = await planGenerator.generatePlan(prefs);
+      
+      stopwatch.stop();
+      
+      // Логируем метрику генерации
+      _analytics.logPlanGeneration(
+        prefs: prefs,
+        system: plan.trainingSystem,
+        generationTime: stopwatch.elapsed,
+        success: true,
       );
+      
+      // Логируем выбор системы
+      if (plan.trainingSystem != null) {
+        _analytics.logSystemSelection(plan.trainingSystem!, prefs);
+      }
+      
+      state = plan;
     } catch (e) {
-      debugPrint('Ошибка при генерации плана по умолчанию: $e');
-    }
-  }
-
-  // Генерация плана на основе предпочтений пользователя
-  Future<void> _generatePlanFromPreferences(UserPreferences prefs) async {
-    try {
-      // Получаем шаблоны тренировок
-      final templates = workoutRepository.getWorkoutTemplates();
+      debugPrint('Ошибка при генерации плана: $e');
       
-      // Выбираем подходящий шаблон на основе предпочтений
-      final selectedTemplate = _selectTemplateByPreferences(templates, prefs);
-      
-      // Создаем план тренировок
-      final workouts = await _createWorkoutSchedule(selectedTemplate, prefs);
-      
-      // Обновляем state
-      state = state.copyWith(
-        workouts: workouts,
-        name: _getPlanName(prefs),
-        description: _getPlanDescription(prefs),
-        userPreferences: prefs,
+      // Логируем ошибку
+      _analytics.logPlanGeneration(
+        prefs: prefs,
+        system: null,
+        generationTime: const Duration(),
+        success: false,
+        error: e.toString(),
       );
-    } catch (e) {
-      debugPrint('Ошибка при генерации плана из предпочтений: $e');
-      // В случае ошибки используем дефолтный план
+      
       await _generateDefaultPlan();
     }
   }
 
-  // Выбор шаблона на основе предпочтений
-  WorkoutTemplate _selectTemplateByPreferences(
-    List<WorkoutTemplate> templates,
-    UserPreferences prefs,
-  ) {
-    // Логика выбора шаблона
-    if (prefs.goal == UserGoal.weightLoss) {
-      return templates.firstWhere(
-        (t) => t.name.toLowerCase().contains('кардио') || t.name.toLowerCase().contains('фулбади'),
-        orElse: () => templates.first,
+  // Загрузка существующего плана
+  void loadPlan(WorkoutPlan plan) {
+    state = plan;
+  }
+
+  // Генерация плана по умолчанию (fallback)
+  Future<void> _generateDefaultPlan() async {
+    try {
+      // Создаем базовые предпочтения для дефолтного плана
+      final defaultPrefs = UserPreferences(
+        goal: UserGoal.generalFitness,
+        experienceLevel: ExperienceLevel.beginner,
+        trainingLocation: TrainingLocation.bodyweight,
+        availableEquipment: [Equipment.bodyweight],
+        daysPerWeek: 3,
+        sessionDuration: 45,
       );
-    } else if (prefs.goal == UserGoal.muscleGain) {
-      return templates.firstWhere(
-        (t) => t.name.toLowerCase().contains('фулбади'),
-        orElse: () => templates.first,
+      
+      final plan = await planGenerator.generatePlan(defaultPrefs);
+      state = plan;
+    } catch (e) {
+      debugPrint('Ошибка при генерации дефолтного плана: $e');
+      // Ultra-fallback - минимальный план
+      state = WorkoutPlan(
+        id: 'minimal_plan',
+        userId: 'default_user',
+        name: 'Минимальный план',
+        description: 'Начните с этого плана',
+        workouts: [
+          Workout(
+            id: 'day1',
+            name: 'Базовая тренировка',
+            dayOfWeek: 1,
+            exercises: [
+              WorkoutExercise(exerciseId: 'chest_01', sets: 3, reps: 10),
+              WorkoutExercise(exerciseId: 'legs_01', sets: 3, reps: 12),
+            ],
+            duration: 30,
+            completed: false,
+          ),
+        ],
+        createdAt: DateTime.now(),
+        userPreferences: null,
       );
-    } else if (prefs.goal == UserGoal.endurance) {
-      return templates.firstWhere(
-        (t) => t.name.toLowerCase().contains('кардио'),
-        orElse: () => templates.first,
-      );
-    } else {
-      return templates.first;
     }
   }
 
-  // Создание расписания тренировок
-  Future<List<Workout>> _createWorkoutSchedule(
-    WorkoutTemplate template,
-    UserPreferences prefs,
-  ) async {
-    final workouts = <Workout>[];
-    final daysPerWeek = prefs.daysPerWeek ?? 3;
-    final sessionDuration = prefs.sessionDuration ?? 45;
+  // Получить рекомендованные системы тренировок для текущего пользователя
+  List<TrainingSystemTemplate> getRecommendedSystems() {
+    if (state.userPreferences == null) return [];
+    return systemRepository.getRecommendedSystems(state.userPreferences!);
+  }
 
-    // Адаптируем упражнения под доступное оборудование
-    final availableExercises = _filterExercisesByEquipment(
-      template.exercises,
-      prefs.availableEquipment,
-    );
+  // Получить лучшую систему для текущего пользователя
+  TrainingSystemTemplate? getBestSystem() {
+    if (state.userPreferences == null) return null;
+    return systemRepository.getBestSystemForUser(state.userPreferences!);
+  }
 
-    // Адаптируем объем тренировки под длительность
-    final adaptedExercises = _adaptWorkoutVolume(
-      availableExercises,
-      sessionDuration,
-      prefs.experienceLevel ?? ExperienceLevel.beginner,
-    );
-
-    // Создаем тренировки на неделю
-    for (int day = 0; day < daysPerWeek; day++) {
-      final workout = Workout(
-        id: 'day_${day + 1}',
-        name: 'День ${day + 1}: ${template.name}',
-        dayOfWeek: day + 1,
-        exercises: List.from(adaptedExercises),
-        duration: sessionDuration,
-        completed: false,
+  // Обновить план с новой системой тренировок
+  Future<void> updateTrainingSystem(TrainingSystem system) async {
+    try {
+      if (state.userPreferences == null) return;
+      
+      // Обновляем предпочтения с новой системой
+      final updatedPrefs = state.userPreferences!.copyWith(
+        preferredSystem: system,
       );
       
-      workouts.add(workout);
+      // Генерируем новый план
+      await setUserPreferences(updatedPrefs);
+    } catch (e) {
+      debugPrint('Ошибка при обновлении системы тренировок: $e');
     }
-
-    return workouts;
   }
 
-  // Фильтрация упражнений по доступному оборудованию
-  List<WorkoutExercise> _filterExercisesByEquipment(
-    List<WorkoutExercise> exercises,
-    List<Equipment> availableEquipment,
-  ) {
-    return exercises.where((exercise) {
-      final ex = _allExercises.firstWhere(
-        (e) => e.id == exercise.exerciseId,
-        orElse: () => Exercise.empty(),
-      );
-      
-      // Если у упражнения нет требований к оборудованию или оборудование доступно
-      if (ex.requiredEquipment.isEmpty) return true;
-      
-      return ex.requiredEquipment.every(
-        (equipment) => availableEquipment.any((e) => e.name == equipment),
-      );
-    }).toList();
-  }
-
-  // Адаптация объема тренировки под длительность и уровень
-  List<WorkoutExercise> _adaptWorkoutVolume(
-    List<WorkoutExercise> exercises,
-    int sessionDuration,
-    ExperienceLevel level,
-  ) {
-    final adaptedExercises = <WorkoutExercise>[];
-    
-    for (final exercise in exercises) {
-      int sets;
-      int reps;
-      
-      // Настройка подходов и повторений в зависимости от уровня
-      switch (level) {
-        case ExperienceLevel.beginner:
-          sets = 3;
-          reps = 10;
-          break;
-        case ExperienceLevel.intermediate:
-          sets = 4;
-          reps = 8;
-          break;
-        case ExperienceLevel.advanced:
-          sets = 5;
-          reps = 6;
-          break;
+  // Сброс и перегенерация плана
+  Future<void> resetPlan() async {
+    try {
+      if (state.userPreferences == null) {
+        await _generateDefaultPlan();
+        return;
       }
       
-      adaptedExercises.add(exercise.copyWith(
-        sets: sets,
-        reps: reps,
-      ));
+      // Перегенерируем план с теми же предпочтениями
+      await setUserPreferences(state.userPreferences!);
+    } catch (e) {
+      debugPrint('Ошибка при сбросе плана: $e');
+      await _generateDefaultPlan();
     }
-    
-    return adaptedExercises;
   }
 
-  // ============ НОВЫЙ МЕТОД ДЛЯ DRAG-AND-DROP ============
+  // Получить статистику по текущей системе тренировок
+  Map<String, dynamic> getSystemStatistics() {
+    if (state.trainingSystem == null || state.userPreferences == null) {
+      return {};
+    }
+    
+    final system = systemRepository.getSystemByType(state.trainingSystem!);
+    if (system == null) return {};
+    
+    final recommendations = planGenerator.getProgressionRecommendations(
+      system.system,
+      state.userPreferences!,
+    );
+    
+    return {
+      'system': system.system.displayName,
+      'description': system.description,
+      'targetAudience': system.targetAudience,
+      'recommendedDays': system.recommendedDaysPerWeek,
+      'recommendedDuration': system.recommendedSessionDuration,
+      'progressionTips': recommendations,
+      'compatibility': system.isCompatibleWith(state.userPreferences!),
+    };
+  }
+
+  // Получить прогресс в текущей системе
+  Map<String, dynamic> getSystemProgress() {
+    final stats = getPlanStatistics();
+    final systemStats = getSystemStatistics();
+    
+    return {
+      'planProgress': stats['planProgress'],
+      'workoutCompletion': stats['workoutCompletionRate'],
+      'setCompletion': stats['setCompletionRate'],
+      'system': systemStats['system'],
+      'nextProgression': systemStats['progressionTips']?['weight'] ?? 'Увеличивайте вес постепенно',
+      'estimatedTimeToGoal': _estimateTimeToGoal(),
+    };
+  }
+
+  String _estimateTimeToGoal() {
+    if (state.userPreferences?.goal == null) return 'Не определено';
+    
+    final progress = getPlanStatistics()['planProgress'] as double;
+    
+    if (progress < 0.3) return '4-6 недель до первых результатов';
+    if (progress < 0.6) return '8-12 недель до заметных изменений';
+    if (progress < 0.8) return '3-6 месяцев до достижения цели';
+    return 'Поддерживайте текущий уровень';
+  }
+
+  // ============ ОСТАЛЬНЫЕ МЕТОДЫ (сохранены из предыдущей версии) ============
 
   // Перестановка упражнений в тренировке
   void reorderExercise({
@@ -259,38 +238,28 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
     required int newIndex,
   }) {
     try {
-      // Находим тренировку по ID
       final workoutIndex = state.workouts.indexWhere((w) => w.id == workoutId);
       if (workoutIndex == -1) return;
       
       final workout = state.workouts[workoutIndex];
       final exercises = [...workout.exercises];
       
-      // Корректируем новый индекс, если старый индекс меньше нового
-      // (это нужно, потому что когда мы удаляем элемент, индексы смещаются)
       if (oldIndex < newIndex) {
         newIndex -= 1;
       }
       
-      // Извлекаем упражнение из старого положения и вставляем в новое
       final exercise = exercises.removeAt(oldIndex);
       exercises.insert(newIndex, exercise);
       
-      // Создаем обновленную тренировку
       final updatedWorkout = workout.copyWith(exercises: exercises);
-      
-      // Создаем обновленный список тренировок
       final updatedWorkouts = List<Workout>.from(state.workouts);
       updatedWorkouts[workoutIndex] = updatedWorkout;
       
-      // Обновляем state
       state = state.copyWith(workouts: updatedWorkouts);
     } catch (e) {
       debugPrint('Ошибка при перестановке упражнения: $e');
     }
   }
-
-  // ============ ПУБЛИЧНЫЕ МЕТОДЫ ============
 
   // Получить упражнение по ID
   Exercise getExerciseById(String exerciseId) {
@@ -317,7 +286,7 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
       if (currentExercise.id.isEmpty) return [];
       
       final availableEquipment = state.userPreferences?.availableEquipment ?? [];
-      final availableEquipmentNames = availableEquipment.map((e) => e.name).toList();
+      final availableEquipmentNames = availableEquipment.map((e) => e.displayName).toList();
       
       // Фильтруем упражнения по доступному оборудованию и группе мышц
       return _allExercises.where((exercise) {
@@ -438,6 +407,9 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
       final workout = state.workouts[workoutIndex];
       if (exerciseIndex >= workout.exercises.length) return;
       
+      // Получаем старое упражнение для логирования
+      final oldExerciseId = workout.exercises[exerciseIndex].exerciseId;
+      
       // Создаем копию упражнения с новым ID
       final exercise = workout.exercises[exerciseIndex];
       final updatedExercise = exercise.copyWith(
@@ -457,9 +429,54 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
       
       // Обновляем state
       state = state.copyWith(workouts: updatedWorkouts);
+      
+      // Логируем замену упражнения
+      _analytics.logExerciseReplacement(
+        oldExerciseId,
+        newExerciseId,
+        'user_replacement',
+      );
     } catch (e) {
       debugPrint('Ошибка при замене упражнения: $e');
     }
+  }
+  
+  // Отправить фидбек о плане
+  void submitPlanFeedback({
+    required bool isPositive,
+    String? comment,
+  }) {
+    _analytics.logPlanFeedback(
+      planId: state.id,
+      isPositive: isPositive,
+      comment: comment,
+      metadata: {
+        'system': state.trainingSystem?.displayName,
+        'workoutsCount': state.workouts.length,
+      },
+    );
+  }
+  
+  // Сообщить о проблеме с упражнением
+  void reportExerciseIssue({
+    required String exerciseId,
+    required String issueType,
+    String? description,
+  }) {
+    _analytics.logExerciseIssue(
+      exerciseId: exerciseId,
+      issueType: issueType,
+      description: description,
+    );
+  }
+  
+  // Получить статистику аналитики
+  Map<String, dynamic> getAnalyticsStatistics() {
+    return {
+      'systemStats': _analytics.getSystemStatistics(),
+      'replacementStats': _analytics.getExerciseReplacementStatistics(),
+      'generationStats': _analytics.getGenerationStatistics(),
+    };
   }
 
   // Обновление выполненных подходов
@@ -546,49 +563,6 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
         .length;
     
     return completedWorkouts / state.workouts.length;
-  }
-
-  // Вспомогательные методы
-  String _getPlanName(UserPreferences prefs) {
-    if (prefs.goal != null) {
-      return 'План: ${prefs.goal!.displayName}';
-    }
-    return 'Персональный план тренировок';
-  }
-
-  String _getPlanDescription(UserPreferences prefs) {
-    final parts = <String>[];
-    
-    if (prefs.experienceLevel != null) {
-      parts.add('Уровень: ${prefs.experienceLevel!.displayName}');
-    }
-    
-    if (prefs.daysPerWeek != null) {
-      parts.add('${prefs.daysPerWeek} дней/неделя');
-    }
-    
-    if (prefs.sessionDuration != null) {
-      parts.add('${prefs.sessionDuration} мин/тренировка');
-    }
-    
-    if (prefs.availableEquipment.isNotEmpty) {
-      final equipmentNames = prefs.availableEquipment
-          .take(3)
-          .map((e) => e.displayName)
-          .join(', ');
-      parts.add('Оборудование: $equipmentNames${prefs.availableEquipment.length > 3 ? '...' : ''}');
-    }
-    
-    return parts.join(' • ');
-  }
-
-  // Сброс плана к начальному состоянию
-  Future<void> resetPlan() async {
-    if (state.userPreferences != null) {
-      await _generatePlanFromPreferences(state.userPreferences!);
-    } else {
-      await _generateDefaultPlan();
-    }
   }
 
   // Получить общее количество выполненных подходов
@@ -748,6 +722,10 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
       buffer.writeln('Оборудование: ${state.userPreferences!.availableEquipment.map((e) => e.displayName).join(", ")}');
     }
     
+    if (state.trainingSystem != null) {
+      buffer.writeln('Система тренировок: ${state.trainingSystem!.displayName}');
+    }
+    
     buffer.writeln();
     buffer.writeln('=' * 50);
     buffer.writeln();
@@ -763,6 +741,13 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
     buffer.writeln();
     
     for (final workout in state.workouts) {
+      if (workout.isRestDay) {
+        buffer.writeln('ДЕНЬ ОТДЫХА');
+        buffer.writeln('-' * 50);
+        buffer.writeln();
+        continue;
+      }
+      
       final dayNames = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
       final dayName = workout.dayOfWeek >= 1 && workout.dayOfWeek <= 7 
           ? dayNames[workout.dayOfWeek - 1] 
@@ -771,6 +756,7 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
       buffer.writeln(workout.name.toUpperCase());
       buffer.writeln('День недели: $dayName');
       buffer.writeln('Длительность: ${workout.duration} минут');
+      buffer.writeln('Фокус: ${workout.focus ?? "Общая тренировка"}');
       buffer.writeln('Статус: ${workout.completed ? "✅ Выполнено" : "⏳ Ожидание"}');
       buffer.writeln();
       
@@ -802,14 +788,28 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
   }
 }
 
-// Провайдеры
+// Обновленные провайдеры
 final workoutRepositoryProvider = Provider<WorkoutRepository>(
   (ref) => WorkoutRepository(),
 );
 
+final trainingSystemRepositoryProvider = Provider<TrainingSystemRepository>(
+  (ref) => TrainingSystemRepository(),
+);
+
+final planGeneratorProvider = Provider<PlanGenerator>(
+  (ref) {
+    final workoutRepo = ref.watch(workoutRepositoryProvider);
+    final systemRepo = ref.watch(trainingSystemRepositoryProvider);
+    return PlanGenerator(systemRepo, workoutRepo);
+  },
+);
+
 final plannerProvider = StateNotifierProvider<PlannerNotifier, WorkoutPlan>(
   (ref) {
-    final repository = ref.watch(workoutRepositoryProvider);
-    return PlannerNotifier(repository);
+    final workoutRepo = ref.watch(workoutRepositoryProvider);
+    final systemRepo = ref.watch(trainingSystemRepositoryProvider);
+    final planGenerator = ref.watch(planGeneratorProvider);
+    return PlannerNotifier(workoutRepo, systemRepo, planGenerator);
   },
 );

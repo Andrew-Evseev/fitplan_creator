@@ -6,6 +6,7 @@ import '../widgets/profile_header.dart';
 import '../widgets/statistics_card.dart';
 import '../widgets/plan_history_card.dart';
 import '../widgets/settings_card.dart';
+import '../widgets/saved_plans_card.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -42,9 +43,11 @@ class ProfileScreen extends ConsumerWidget {
             
             StatisticsCard(userProfile: userProfile),
             
+            SavedPlansCard(savedPlans: userProfile.savedPlans),
+            
             PlanHistoryCard(workoutHistory: userProfile.workoutHistory),
             
-            const SettingsCard(),  // Убрал параметр settings
+            const SettingsCard(),
             
             Padding(
               padding: const EdgeInsets.all(16),
@@ -73,6 +76,17 @@ class ProfileScreen extends ConsumerWidget {
                       label: const Text('Поделиться прогрессом'),
                       onPressed: () {
                         // TODO: Поделиться прогрессом
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.bug_report),
+                      label: const Text('Тестовый режим генератора'),
+                      onPressed: () {
+                        context.go('/test');
                       },
                     ),
                   ),

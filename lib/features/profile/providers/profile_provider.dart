@@ -1,6 +1,7 @@
 // lib/features/profile/providers/profile_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_profile.dart';
+import 'package:fitplan_creator/data/models/workout_plan.dart';
 
 class ProfileNotifier extends StateNotifier<UserProfile> {
   ProfileNotifier() : super(_initialProfile());
@@ -114,6 +115,58 @@ class ProfileNotifier extends StateNotifier<UserProfile> {
       'topMuscleGroup': getTopMuscleGroup(),
       'averageWorkoutTime': state.stats.averageWorkoutTime.toStringAsFixed(1),
     };
+  }
+
+  // Сохранение плана тренировок
+  void savePlan(WorkoutPlan plan) {
+    // Проверяем, не сохранен ли уже этот план
+    final existingIndex = state.savedPlans.indexWhere((p) => p.planId == plan.id);
+    
+    final savedPlan = SavedPlan(
+      planId: plan.id,
+      name: plan.name,
+      description: plan.description,
+      savedAt: DateTime.now(),
+      planCreatedAt: plan.createdAt,
+      trainingSystem: plan.trainingSystem?.displayName,
+      workoutsCount: plan.workouts.length,
+      planData: plan.toJson(),
+    );
+
+    final updatedPlans = List<SavedPlan>.from(state.savedPlans);
+    
+    if (existingIndex != -1) {
+      // Обновляем существующий план
+      updatedPlans[existingIndex] = savedPlan;
+    } else {
+      // Добавляем новый план
+      updatedPlans.add(savedPlan);
+    }
+
+    state = state.copyWith(savedPlans: updatedPlans);
+  }
+
+  // Удаление сохраненного плана
+  void deleteSavedPlan(String planId) {
+    final updatedPlans = state.savedPlans.where((p) => p.planId != planId).toList();
+    state = state.copyWith(savedPlans: updatedPlans);
+  }
+
+  // Загрузка плана из сохраненных
+  WorkoutPlan? loadSavedPlan(String planId) {
+    try {
+      final savedPlan = state.savedPlans.firstWhere(
+        (p) => p.planId == planId,
+      );
+      return WorkoutPlan.fromJson(savedPlan.planData);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Получить все сохраненные планы
+  List<SavedPlan> getSavedPlans() {
+    return List.from(state.savedPlans);
   }
 }
 

@@ -262,26 +262,26 @@ class UserPreferences {
   Map<String, dynamic> toJson() {
     return {
       // Базовые данные
-      'gender': gender?.name,
+      'gender': gender?.displayName,
       'age': age,
       'height': height,
       'weight': weight,
       'targetWeight': targetWeight,
       
       // Цели и активность
-      'goal': goal?.name,
-      'activityLevel': activityLevel?.name,
+      'goal': goal?.displayName,
+      'activityLevel': activityLevel?.displayName,
       
       // Опыт и телосложение
-      'experienceLevel': experienceLevel?.name,
-      'bodyType': bodyType?.name,
+      'experienceLevel': experienceLevel?.displayName,
+      'bodyType': bodyType?.displayName,
       
       // Место тренировок и оборудование
-      'trainingLocation': trainingLocation?.name,
-      'availableEquipment': availableEquipment.map((e) => e.name).toList(),
+      'trainingLocation': trainingLocation?.displayName,
+      'availableEquipment': availableEquipment.map((e) => e.displayName).toList(),
       
       // Ограничения по здоровью
-      'healthRestrictions': healthRestrictions.map((e) => e.name).toList(),
+      'healthRestrictions': healthRestrictions.map((e) => e.displayName).toList(),
       
       // Предпочтения
       'favoriteMuscleGroups': favoriteMuscleGroups,
@@ -292,7 +292,7 @@ class UserPreferences {
       'sessionDuration': sessionDuration,
       
       // Система тренировок
-      'preferredSystem': preferredSystem?.name,
+      'preferredSystem': preferredSystem?.displayName,
       
       // Дополнительные параметры
       'createdAt': createdAt?.toIso8601String(),
@@ -303,33 +303,96 @@ class UserPreferences {
 
   // Десериализация
   factory UserPreferences.fromJson(Map<String, dynamic> json) {
+    // Вспомогательные функции для поиска enum по displayName
+    Gender? _findGenderByDisplayName(String? displayName) {
+      if (displayName == null) return null;
+      return Gender.values.firstWhere(
+        (g) => g.displayName == displayName,
+        orElse: () => Gender.male,
+      );
+    }
+    
+    UserGoal? _findGoalByDisplayName(String? displayName) {
+      if (displayName == null) return null;
+      return UserGoal.values.firstWhere(
+        (g) => g.displayName == displayName,
+        orElse: () => UserGoal.generalFitness,
+      );
+    }
+    
+    ActivityLevel? _findActivityLevelByDisplayName(String? displayName) {
+      if (displayName == null) return null;
+      return ActivityLevel.values.firstWhere(
+        (a) => a.displayName == displayName,
+        orElse: () => ActivityLevel.sedentary,
+      );
+    }
+    
+    ExperienceLevel? _findLevelByDisplayName(String? displayName) {
+      if (displayName == null) return null;
+      return ExperienceLevel.values.firstWhere(
+        (l) => l.displayName == displayName,
+        orElse: () => ExperienceLevel.beginner,
+      );
+    }
+    
+    BodyType? _findBodyTypeByDisplayName(String? displayName) {
+      if (displayName == null) return null;
+      return BodyType.values.firstWhere(
+        (b) => b.displayName == displayName,
+        orElse: () => BodyType.mesomorph,
+      );
+    }
+    
+    TrainingLocation? _findLocationByDisplayName(String? displayName) {
+      if (displayName == null) return null;
+      return TrainingLocation.values.firstWhere(
+        (l) => l.displayName == displayName,
+        orElse: () => TrainingLocation.gym,
+      );
+    }
+    
+    Equipment _findEquipmentByDisplayName(String displayName) {
+      return Equipment.values.firstWhere(
+        (e) => e.displayName == displayName,
+        orElse: () => Equipment.bodyweight,
+      );
+    }
+    
+    HealthRestriction _findHealthRestrictionByDisplayName(String displayName) {
+      return HealthRestriction.values.firstWhere(
+        (h) => h.displayName == displayName,
+        orElse: () => HealthRestriction.none,
+      );
+    }
+    
+    TrainingSystem? _findSystemByDisplayName(String? displayName) {
+      if (displayName == null) return null;
+      return TrainingSystem.values.firstWhere(
+        (s) => s.displayName == displayName,
+        orElse: () => TrainingSystem.fullBody,
+      );
+    }
+    
     return UserPreferences(
-      gender: json['gender'] != null ? Gender.values.byName(json['gender']) : null,
+      gender: _findGenderByDisplayName(json['gender'] as String?),
       age: json['age'],
       height: json['height']?.toDouble(),
       weight: json['weight']?.toDouble(),
       targetWeight: json['targetWeight']?.toDouble(),
-      goal: json['goal'] != null ? UserGoal.values.byName(json['goal']) : null,
-      activityLevel: json['activityLevel'] != null 
-          ? ActivityLevel.values.byName(json['activityLevel']) 
-          : null,
-      experienceLevel: json['experienceLevel'] != null
-          ? ExperienceLevel.values.byName(json['experienceLevel'])
-          : null,
-      bodyType: json['bodyType'] != null 
-          ? BodyType.values.byName(json['bodyType']) 
-          : null,
-      trainingLocation: json['trainingLocation'] != null
-          ? TrainingLocation.values.byName(json['trainingLocation'])
-          : null,
+      goal: _findGoalByDisplayName(json['goal'] as String?),
+      activityLevel: _findActivityLevelByDisplayName(json['activityLevel'] as String?),
+      experienceLevel: _findLevelByDisplayName(json['experienceLevel'] as String?),
+      bodyType: _findBodyTypeByDisplayName(json['bodyType'] as String?),
+      trainingLocation: _findLocationByDisplayName(json['trainingLocation'] as String?),
       availableEquipment: json['availableEquipment'] != null
           ? (json['availableEquipment'] as List)
-              .map((e) => Equipment.values.byName(e))
+              .map((e) => _findEquipmentByDisplayName(e as String))
               .toList()
           : [],
       healthRestrictions: json['healthRestrictions'] != null
           ? (json['healthRestrictions'] as List)
-              .map((e) => HealthRestriction.values.byName(e))
+              .map((e) => _findHealthRestrictionByDisplayName(e as String))
               .toList()
           : [],
       favoriteMuscleGroups: json['favoriteMuscleGroups'] != null
@@ -340,9 +403,7 @@ class UserPreferences {
           : [],
       daysPerWeek: json['daysPerWeek'],
       sessionDuration: json['sessionDuration'],
-      preferredSystem: json['preferredSystem'] != null
-          ? TrainingSystem.values.byName(json['preferredSystem'])
-          : null,
+      preferredSystem: _findSystemByDisplayName(json['preferredSystem'] as String?),
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : null,
@@ -430,6 +491,9 @@ class UserPreferences {
   TrainingSystem get recommendedSystem {
     if (preferredSystem != null) return preferredSystem!;
     
+    // Значение по умолчанию для daysPerWeek если не установлено
+    final days = daysPerWeek ?? 3;
+    
     // Алгоритм выбора системы
     if (experienceLevel == ExperienceLevel.beginner) {
       if (goal == UserGoal.weightLoss) {
@@ -441,7 +505,7 @@ class UserPreferences {
       }
     } else if (experienceLevel == ExperienceLevel.intermediate) {
       if (goal == UserGoal.muscleGain) {
-        return daysPerWeek! >= 4 ? TrainingSystem.ppl : TrainingSystem.split;
+        return days >= 4 ? TrainingSystem.ppl : TrainingSystem.split;
       } else if (goal == UserGoal.weightLoss) {
         return TrainingSystem.circuit;
       } else {
@@ -449,7 +513,7 @@ class UserPreferences {
       }
     } else { // advanced
       if (goal == UserGoal.muscleGain || goal == UserGoal.strength) {
-        return daysPerWeek! >= 5 ? TrainingSystem.ppl : TrainingSystem.split;
+        return days >= 5 ? TrainingSystem.ppl : TrainingSystem.split;
       } else if (goal == UserGoal.weightLoss) {
         return TrainingSystem.upperLower;
       } else {

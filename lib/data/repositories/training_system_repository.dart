@@ -575,21 +575,21 @@ class TrainingSystemRepository {
       'totalSystems': _systemTemplates.length,
       'byType': {
         for (var system in TrainingSystem.values)
-          system.name: _systemTemplates
+          system.displayName: _systemTemplates
               .where((t) => t.system == system)
               .length,
       },
       'byGoal': {
         for (var goal in UserGoal.values)
-          goal.name: getSystemsByGoal(goal).length,
+          goal.displayName: getSystemsByGoal(goal).length,
       },
       'byExperience': {
         for (var level in ExperienceLevel.values)
-          level.name: getSystemsByExperience(level).length,
+          level.displayName: getSystemsByExperience(level).length,
       },
       'byLocation': {
         for (var location in TrainingLocation.values)
-          location.name: getSystemsByLocation(location).length,
+          location.displayName: getSystemsByLocation(location).length,
       },
     };
   }

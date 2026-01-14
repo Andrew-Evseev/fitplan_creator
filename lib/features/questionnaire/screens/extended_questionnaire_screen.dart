@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:fitplan_creator/core/widgets/custom_button.dart';
 import 'package:fitplan_creator/core/widgets/loading_indicator.dart';
 import 'package:fitplan_creator/data/models/user_preferences.dart';
-import 'package:fitplan_creator/data/models/training_system.dart';
 import 'package:fitplan_creator/features/questionnaire/providers/questionnaire_provider.dart';
 import 'package:fitplan_creator/features/planner/providers/planner_provider.dart';
 
@@ -863,7 +862,7 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
                           ref.read(questionnaireProvider.notifier).toggleEquipment(equipment);
                         }
                       },
-                      selectedColor: _getLocationColor(selectedLocation!),
+                      selectedColor: _getLocationColor(selectedLocation),
                       checkmarkColor: Colors.white,
                       labelStyle: TextStyle(
                         color: isSelected ? Colors.white : Colors.grey[700],

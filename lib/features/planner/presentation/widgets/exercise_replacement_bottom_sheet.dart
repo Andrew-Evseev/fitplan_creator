@@ -23,7 +23,7 @@ class ExerciseReplacementBottomSheet extends ConsumerWidget {
     final availableEquipment = ref.watch(questionnaireProvider).availableEquipment;
     
     // ИСПРАВЛЕНО: получаем equipment как список строк
-    final availableEquipmentNames = availableEquipment.map((e) => e.name).toList();
+    final availableEquipmentNames = availableEquipment.map((e) => e.displayName).toList();
     
     final currentExercise = repository.getExerciseById(currentExerciseId);
     final alternativeExercises = repository.findAlternativeExercises(
@@ -67,7 +67,7 @@ class ExerciseReplacementBottomSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           
-          if (currentExercise != null && currentExercise.id.isNotEmpty)
+          if (currentExercise.id.isNotEmpty)
             Card(
               color: const Color(0xFFE3F2FD),
               child: Padding(
@@ -149,7 +149,7 @@ class ExerciseReplacementBottomSheet extends ConsumerWidget {
                 selected: true,
                 onSelected: null,
               ),
-              if (currentExercise != null && currentExercise.difficulty.name.isNotEmpty)
+              if (currentExercise.difficulty.name.isNotEmpty)
                 FilterChip(
                   label: Text('Сложность: ${_getDifficultyName(currentExercise.difficulty.name)}'),
                   selected: true,

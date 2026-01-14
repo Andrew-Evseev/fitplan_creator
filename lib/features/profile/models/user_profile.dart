@@ -1,5 +1,5 @@
 // lib/features/profile/models/user_profile.dart
-// Убрали ненужный импорт
+import 'package:fitplan_creator/data/models/workout_plan.dart';
 
 class UserProfile {
   final String id;
@@ -10,6 +10,7 @@ class UserProfile {
   final UserStats stats;
   final UserSettings settings;
   final List<WorkoutHistory> workoutHistory;
+  final List<SavedPlan> savedPlans; // Сохраненные планы тренировок
 
   UserProfile({
     required this.id,
@@ -20,6 +21,7 @@ class UserProfile {
     required this.stats,
     required this.settings,
     required this.workoutHistory,
+    required this.savedPlans,
   });
 
   factory UserProfile.initial(String id, String name) {
@@ -30,6 +32,7 @@ class UserProfile {
       stats: UserStats.initial(),
       settings: UserSettings.defaultSettings(),
       workoutHistory: [],
+      savedPlans: [],
     );
   }
 
@@ -42,6 +45,7 @@ class UserProfile {
     UserStats? stats,
     UserSettings? settings,
     List<WorkoutHistory>? workoutHistory,
+    List<SavedPlan>? savedPlans,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -52,6 +56,7 @@ class UserProfile {
       stats: stats ?? this.stats,
       settings: settings ?? this.settings,
       workoutHistory: workoutHistory ?? this.workoutHistory,
+      savedPlans: savedPlans ?? this.savedPlans,
     );
   }
 
@@ -65,6 +70,7 @@ class UserProfile {
       'stats': stats.toMap(),
       'settings': settings.toMap(),
       'workoutHistory': workoutHistory.map((h) => h.toMap()).toList(),
+      'savedPlans': savedPlans.map((p) => p.toMap()).toList(),
     };
   }
 
@@ -79,6 +85,9 @@ class UserProfile {
       settings: UserSettings.fromMap(map['settings'] as Map<String, dynamic>),
       workoutHistory: (map['workoutHistory'] as List)
           .map((h) => WorkoutHistory.fromMap(h as Map<String, dynamic>))
+          .toList(),
+      savedPlans: (map['savedPlans'] as List? ?? [])
+          .map((p) => SavedPlan.fromMap(p as Map<String, dynamic>))
           .toList(),
     );
   }
@@ -265,6 +274,79 @@ class UserSettings {
       units: units ?? this.units,
       autoSave: autoSave ?? this.autoSave,
       showTutorials: showTutorials ?? this.showTutorials,
+    );
+  }
+}
+
+// Модель сохраненного плана
+class SavedPlan {
+  final String planId;
+  final String name;
+  final String description;
+  final DateTime savedAt;
+  final DateTime? planCreatedAt;
+  final String? trainingSystem;
+  final int workoutsCount;
+  final Map<String, dynamic> planData; // Полные данные плана в JSON формате
+
+  SavedPlan({
+    required this.planId,
+    required this.name,
+    required this.description,
+    required this.savedAt,
+    this.planCreatedAt,
+    this.trainingSystem,
+    required this.workoutsCount,
+    required this.planData,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'planId': planId,
+      'name': name,
+      'description': description,
+      'savedAt': savedAt.toIso8601String(),
+      'planCreatedAt': planCreatedAt?.toIso8601String(),
+      'trainingSystem': trainingSystem,
+      'workoutsCount': workoutsCount,
+      'planData': planData,
+    };
+  }
+
+  factory SavedPlan.fromMap(Map<String, dynamic> map) {
+    return SavedPlan(
+      planId: map['planId'] as String,
+      name: map['name'] as String,
+      description: map['description'] as String,
+      savedAt: DateTime.parse(map['savedAt'] as String),
+      planCreatedAt: map['planCreatedAt'] != null
+          ? DateTime.parse(map['planCreatedAt'] as String)
+          : null,
+      trainingSystem: map['trainingSystem'] as String?,
+      workoutsCount: map['workoutsCount'] as int,
+      planData: Map<String, dynamic>.from(map['planData'] as Map),
+    );
+  }
+
+  SavedPlan copyWith({
+    String? planId,
+    String? name,
+    String? description,
+    DateTime? savedAt,
+    DateTime? planCreatedAt,
+    String? trainingSystem,
+    int? workoutsCount,
+    Map<String, dynamic>? planData,
+  }) {
+    return SavedPlan(
+      planId: planId ?? this.planId,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      savedAt: savedAt ?? this.savedAt,
+      planCreatedAt: planCreatedAt ?? this.planCreatedAt,
+      trainingSystem: trainingSystem ?? this.trainingSystem,
+      workoutsCount: workoutsCount ?? this.workoutsCount,
+      planData: planData ?? this.planData,
     );
   }
 }

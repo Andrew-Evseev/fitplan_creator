@@ -1,3 +1,4 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/router.dart';
@@ -28,6 +29,14 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Roboto',
         useMaterial3: true,
       ),
+      darkTheme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF121212),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF1E1E1E),
+          foregroundColor: Colors.white,
+        ),
+      ),
+      themeMode: ThemeMode.light,
       debugShowCheckedModeBanner: false,
       routerConfig: router,
     );

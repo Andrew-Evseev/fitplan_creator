@@ -1,14 +1,14 @@
 // lib/app/router.dart
-import 'package:flutter/material.dart'; // Добавляем этот импорт
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fitplan_creator/features/onboarding/presentation/screens/welcome_screen.dart';
 import 'package:fitplan_creator/features/onboarding/presentation/screens/loading_screen.dart';
+import 'package:fitplan_creator/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:fitplan_creator/features/planner/presentation/screens/planner_screen.dart';
 import 'package:fitplan_creator/features/profile/presentation/screens/profile_screen.dart';
-// Импорт новой расширенной анкеты
 import 'package:fitplan_creator/features/questionnaire/screens/extended_questionnaire_screen.dart';
-// Также можно оставить старую анкету для отката, если нужно
 import 'package:fitplan_creator/features/questionnaire/screens/questionnaire_screen.dart';
+import 'package:fitplan_creator/features/test/screens/test_generator_screen.dart';
 
 final router = GoRouter(
   initialLocation: '/welcome',
@@ -19,12 +19,15 @@ final router = GoRouter(
       builder: (context, state) => const WelcomeScreen(),
     ),
     GoRoute(
+      path: '/onboarding',
+      name: 'onboarding',
+      builder: (context, state) => const OnboardingScreen(),
+    ),
+    GoRoute(
       path: '/questionnaire',
       name: 'questionnaire',
-      // ИЗМЕНЕНИЕ: Используем расширенную анкету вместо обычной
       builder: (context, state) => const ExtendedQuestionnaireScreen(),
     ),
-    // Можно добавить отдельный маршрут для старой анкеты, если нужно
     GoRoute(
       path: '/questionnaire-old',
       name: 'questionnaire-old',
@@ -45,8 +48,12 @@ final router = GoRouter(
       name: 'profile',
       builder: (context, state) => const ProfileScreen(),
     ),
+    GoRoute(
+      path: '/test',
+      name: 'test',
+      builder: (context, state) => const TestGeneratorScreen(),
+    ),
   ],
-  // Редирект с корня на welcome
   redirect: (context, state) {
     if (state.matchedLocation == '/') {
       return '/welcome';

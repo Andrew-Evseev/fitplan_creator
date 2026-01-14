@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:fitplan_creator/data/models/workout_exercise.dart';
-import 'package:fitplan_creator/data/models/exercise.dart'; // ← ДОБАВЛЕН ИМПОРТ
 import 'package:fitplan_creator/data/repositories/workout_repository.dart';
 import 'pulsing_exercise_icon.dart';
 

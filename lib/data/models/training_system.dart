@@ -1,6 +1,5 @@
 // lib/data/models/training_system.dart
 import 'package:fitplan_creator/data/models/user_preferences.dart';
-import 'package:fitplan_creator/data/models/workout_exercise.dart';
 
 // Модель для шаблона тренировочной системы
 class TrainingSystemTemplate {
@@ -44,16 +43,20 @@ class TrainingSystemTemplate {
 
   // Проверка совместимости с профилем пользователя
   bool isCompatibleWith(UserPreferences prefs) {
-    // Проверка цели
-    if (!compatibleGoals.contains(prefs.goal) && primaryGoal != prefs.goal) {
-      return false;
+    // Проверка цели (если цель не указана, пропускаем проверку)
+    if (prefs.goal != null) {
+      if (!compatibleGoals.contains(prefs.goal) && primaryGoal != prefs.goal) {
+        return false;
+      }
     }
 
-    // Проверка уровня опыта
-    if (!compatibleLevels.contains(prefs.experienceLevel) &&
-        _getExperienceLevelValue(prefs.experienceLevel) < 
-        _getExperienceLevelValue(minExperienceLevel)) {
-      return false;
+    // Проверка уровня опыта (если уровень не указан, пропускаем проверку)
+    if (prefs.experienceLevel != null) {
+      if (!compatibleLevels.contains(prefs.experienceLevel) &&
+          _getExperienceLevelValue(prefs.experienceLevel) <
+          _getExperienceLevelValue(minExperienceLevel)) {
+        return false;
+      }
     }
 
     // Проверка доступности оборудования
@@ -102,23 +105,57 @@ class TrainingSystemTemplate {
 
   // Адаптировать систему под пользователя
   TrainingSystemTemplate adaptToUser(UserPreferences prefs) {
+    // Если структура пустая, возвращаем оригинальную систему
+    if (weeklyStructure.isEmpty) {
+      return this;
+    }
+    
     final adaptedStructure = Map<int, WorkoutDayTemplate>.from(weeklyStructure);
     
     // Адаптация количества дней
     if (prefs.daysPerWeek != null && prefs.daysPerWeek != recommendedDaysPerWeek) {
-      adaptedStructure.clear();
-      
-      // Создаем упрощенную структуру для меньшего количества дней
+      // Если нужно меньше дней, берем первые тренировочные дни из структуры
       if (prefs.daysPerWeek! < recommendedDaysPerWeek) {
-        for (int i = 1; i <= prefs.daysPerWeek!; i++) {
-          adaptedStructure[i] = WorkoutDayTemplate(
-            dayNumber: i,
-            focus: 'Full Body',
-            exercises: [],
-            isRestDay: false,
-          );
+        final workoutDays = weeklyStructure.values
+            .where((day) => !day.isRestDay)
+            .take(prefs.daysPerWeek!)
+            .toList();
+        
+        if (workoutDays.isEmpty) {
+          // Если нет тренировочных дней, возвращаем оригинальную структуру
+          return this;
+        }
+        
+        adaptedStructure.clear();
+        for (int i = 0; i < workoutDays.length; i++) {
+          adaptedStructure[i + 1] = workoutDays[i].copyWith(dayNumber: i + 1);
+        }
+      } else {
+        // Если нужно больше дней, повторяем структуру
+        final workoutDays = weeklyStructure.values
+            .where((day) => !day.isRestDay)
+            .toList();
+        
+        if (workoutDays.isEmpty) {
+          // Если нет тренировочных дней, возвращаем оригинальную структуру
+          return this;
+        }
+        
+        adaptedStructure.clear();
+        int dayCounter = 1;
+        while (dayCounter <= prefs.daysPerWeek!) {
+          for (final workoutDay in workoutDays) {
+            if (dayCounter > prefs.daysPerWeek!) break;
+            adaptedStructure[dayCounter] = workoutDay.copyWith(dayNumber: dayCounter);
+            dayCounter++;
+          }
         }
       }
+    }
+
+    // Убеждаемся, что структура не пустая
+    if (adaptedStructure.isEmpty) {
+      return this; // Возвращаем оригинальную структуру
     }
 
     return copyWith(weeklyStructure: adaptedStructure);
@@ -214,19 +251,19 @@ class TrainingSystemTemplate {
 
   Map<String, dynamic> toJson() {
     return {
-      'system': system.name,
+      'system': system.displayName,
       'name': name,
       'description': description,
       'targetAudience': targetAudience,
-      'primaryGoal': primaryGoal.name,
-      'compatibleGoals': compatibleGoals.map((g) => g.name).toList(),
-      'minExperienceLevel': minExperienceLevel.name,
-      'compatibleLevels': compatibleLevels.map((l) => l.name).toList(),
-      'recommendedBodyType': recommendedBodyType?.name,
+      'primaryGoal': primaryGoal.displayName,
+      'compatibleGoals': compatibleGoals.map((g) => g.displayName).toList(),
+      'minExperienceLevel': minExperienceLevel.displayName,
+      'compatibleLevels': compatibleLevels.map((l) => l.displayName).toList(),
+      'recommendedBodyType': recommendedBodyType?.displayName,
       'recommendedDaysPerWeek': recommendedDaysPerWeek,
       'recommendedSessionDuration': recommendedSessionDuration,
-      'recommendedLocation': recommendedLocation.name,
-      'requiredEquipment': requiredEquipment.map((e) => e.name).toList(),
+      'recommendedLocation': recommendedLocation.displayName,
+      'requiredEquipment': requiredEquipment.map((e) => e.displayName).toList(),
       'weeklyStructure': weeklyStructure.map((key, value) => 
           MapEntry(key.toString(), value.toJson())),
       'progressionRules': progressionRules,
@@ -236,27 +273,69 @@ class TrainingSystemTemplate {
   }
 
   factory TrainingSystemTemplate.fromJson(Map<String, dynamic> json) {
+    // Вспомогательная функция для поиска enum по displayName
+    TrainingSystem _findSystemByDisplayName(String displayName) {
+      return TrainingSystem.values.firstWhere(
+        (s) => s.displayName == displayName,
+        orElse: () => TrainingSystem.fullBody,
+      );
+    }
+    
+    UserGoal _findGoalByDisplayName(String displayName) {
+      return UserGoal.values.firstWhere(
+        (g) => g.displayName == displayName,
+        orElse: () => UserGoal.generalFitness,
+      );
+    }
+    
+    ExperienceLevel _findLevelByDisplayName(String displayName) {
+      return ExperienceLevel.values.firstWhere(
+        (l) => l.displayName == displayName,
+        orElse: () => ExperienceLevel.beginner,
+      );
+    }
+    
+    BodyType? _findBodyTypeByDisplayName(String? displayName) {
+      if (displayName == null) return null;
+      return BodyType.values.firstWhere(
+        (b) => b.displayName == displayName,
+        orElse: () => BodyType.mesomorph,
+      );
+    }
+    
+    TrainingLocation _findLocationByDisplayName(String displayName) {
+      return TrainingLocation.values.firstWhere(
+        (l) => l.displayName == displayName,
+        orElse: () => TrainingLocation.gym,
+      );
+    }
+    
+    Equipment _findEquipmentByDisplayName(String displayName) {
+      return Equipment.values.firstWhere(
+        (e) => e.displayName == displayName,
+        orElse: () => Equipment.bodyweight,
+      );
+    }
+    
     return TrainingSystemTemplate(
-      system: TrainingSystem.values.byName(json['system']),
+      system: _findSystemByDisplayName(json['system'] as String),
       name: json['name'] as String,
       description: json['description'] as String,
       targetAudience: json['targetAudience'] as String,
-      primaryGoal: UserGoal.values.byName(json['primaryGoal']),
+      primaryGoal: _findGoalByDisplayName(json['primaryGoal'] as String),
       compatibleGoals: (json['compatibleGoals'] as List<dynamic>?)
-          ?.map((g) => UserGoal.values.byName(g as String))
+          ?.map((g) => _findGoalByDisplayName(g as String))
           .toList() ?? [],
-      minExperienceLevel: ExperienceLevel.values.byName(json['minExperienceLevel']),
+      minExperienceLevel: _findLevelByDisplayName(json['minExperienceLevel'] as String),
       compatibleLevels: (json['compatibleLevels'] as List<dynamic>?)
-          ?.map((l) => ExperienceLevel.values.byName(l as String))
+          ?.map((l) => _findLevelByDisplayName(l as String))
           .toList() ?? [],
-      recommendedBodyType: json['recommendedBodyType'] != null
-          ? BodyType.values.byName(json['recommendedBodyType'] as String)
-          : null,
+      recommendedBodyType: _findBodyTypeByDisplayName(json['recommendedBodyType'] as String?),
       recommendedDaysPerWeek: json['recommendedDaysPerWeek'] as int,
       recommendedSessionDuration: json['recommendedSessionDuration'] as int,
-      recommendedLocation: TrainingLocation.values.byName(json['recommendedLocation']),
+      recommendedLocation: _findLocationByDisplayName(json['recommendedLocation'] as String),
       requiredEquipment: (json['requiredEquipment'] as List<dynamic>?)
-          ?.map((e) => Equipment.values.byName(e as String))
+          ?.map((e) => _findEquipmentByDisplayName(e as String))
           .toList() ?? [],
       weeklyStructure: (json['weeklyStructure'] as Map<String, dynamic>).map(
         (key, value) => MapEntry(
