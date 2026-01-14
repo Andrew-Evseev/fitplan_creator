@@ -49,7 +49,9 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'chest_01', sets: 3, reps: 10), // Отжимания
             ExerciseTemplate(exerciseId: 'back_01', sets: 3, reps: 8), // Подтягивания
             ExerciseTemplate(exerciseId: 'shoulders_01', sets: 3, reps: 10), // Жим гантелей
+            ExerciseTemplate(exerciseId: 'arms_01', sets: 3, reps: 12), // Подъем гантелей на бицепс
             ExerciseTemplate(exerciseId: 'abs_01', sets: 3, reps: 15), // Скручивания
+            ExerciseTemplate(exerciseId: 'legs_02', sets: 3, reps: 12), // Выпады
           ],
         ),
         2: WorkoutDayTemplate(dayNumber: 2, focus: 'Rest', exercises: [], isRestDay: true),
@@ -60,8 +62,10 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'legs_04', sets: 3, reps: 8), // Становая тяга
             ExerciseTemplate(exerciseId: 'chest_07', sets: 3, reps: 10), // Жим гантелей
             ExerciseTemplate(exerciseId: 'back_04', sets: 3, reps: 10), // Тяга гантели
-            ExerciseTemplate(exerciseId: 'arms_01', sets: 3, reps: 12), // Подъем гантелей
+            ExerciseTemplate(exerciseId: 'shoulders_03', sets: 3, reps: 12), // Разведение гантелей
+            ExerciseTemplate(exerciseId: 'arms_02', sets: 3, reps: 10), // Разгибания на трицепс
             ExerciseTemplate(exerciseId: 'abs_02', sets: 3, reps: 45), // Планка
+            ExerciseTemplate(exerciseId: 'legs_05', sets: 3, reps: 12), // Румынская тяга
           ],
         ),
         4: WorkoutDayTemplate(dayNumber: 4, focus: 'Rest', exercises: [], isRestDay: true),
@@ -73,7 +77,9 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'chest_02', sets: 3, reps: 12), // Отжимания с колен
             ExerciseTemplate(exerciseId: 'back_03', sets: 3, reps: 10), // Австралийские подтягивания
             ExerciseTemplate(exerciseId: 'shoulders_02', sets: 3, reps: 15), // Махи гантелями
+            ExerciseTemplate(exerciseId: 'arms_03', sets: 3, reps: 12), // Концентрированные сгибания
             ExerciseTemplate(exerciseId: 'abs_03', sets: 3, reps: 15), // Подъем ног
+            ExerciseTemplate(exerciseId: 'legs_06', sets: 3, reps: 10), // Болгарские приседания
           ],
         ),
         6: WorkoutDayTemplate(dayNumber: 6, focus: 'Rest', exercises: [], isRestDay: true),
@@ -122,8 +128,10 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'chest_12', sets: 4, reps: 8), // Жим штанги
             ExerciseTemplate(exerciseId: 'chest_08', sets: 3, reps: 12), // Разведение гантелей
             ExerciseTemplate(exerciseId: 'chest_14', sets: 3, reps: 15), // Сведение в тренажере
+            ExerciseTemplate(exerciseId: 'chest_01', sets: 3, reps: 12), // Отжимания
             ExerciseTemplate(exerciseId: 'arms_05', sets: 3, reps: 10), // Французский жим
             ExerciseTemplate(exerciseId: 'arms_06', sets: 3, reps: 12), // Разгибания на блоке
+            ExerciseTemplate(exerciseId: 'arms_07', sets: 3, reps: 10), // Отжимания на брусьях
           ],
         ),
         2: WorkoutDayTemplate(
@@ -133,8 +141,10 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'back_05', sets: 4, reps: 8), // Тяга штанги
             ExerciseTemplate(exerciseId: 'back_01', sets: 3, reps: 8), // Подтягивания
             ExerciseTemplate(exerciseId: 'back_06', sets: 3, reps: 12), // Горизонтальная тяга
+            ExerciseTemplate(exerciseId: 'back_04', sets: 3, reps: 10), // Тяга гантели одной рукой
             ExerciseTemplate(exerciseId: 'arms_01', sets: 3, reps: 10), // Подъем гантелей
             ExerciseTemplate(exerciseId: 'arms_03', sets: 3, reps: 12), // Концентрированные сгибания
+            ExerciseTemplate(exerciseId: 'arms_04', sets: 3, reps: 10), // Молотки
           ],
         ),
         3: WorkoutDayTemplate(dayNumber: 3, focus: 'Rest', exercises: [], isRestDay: true),
@@ -158,8 +168,10 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'abs_01', sets: 4, reps: 20), // Скручивания
             ExerciseTemplate(exerciseId: 'abs_03', sets: 3, reps: 15), // Подъем ног
             ExerciseTemplate(exerciseId: 'abs_05', sets: 3, reps: 20), // Велосипед
+            ExerciseTemplate(exerciseId: 'abs_02', sets: 3, reps: 45), // Планка
             ExerciseTemplate(exerciseId: 'cardio_02', sets: 1, reps: 20), // Скакалка
             ExerciseTemplate(exerciseId: 'cardio_08', sets: 3, reps: 30), // Скалолаз
+            ExerciseTemplate(exerciseId: 'cardio_01', sets: 1, reps: 15), // Берпи
           ],
         ),
         7: WorkoutDayTemplate(dayNumber: 7, focus: 'Rest', exercises: [], isRestDay: true),
@@ -203,8 +215,10 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'chest_12', sets: 4, reps: 8), // Жим штанги
             ExerciseTemplate(exerciseId: 'shoulders_05', sets: 3, reps: 8), // Жим штанги стоя
             ExerciseTemplate(exerciseId: 'chest_08', sets: 3, reps: 12), // Разведение гантелей
+            ExerciseTemplate(exerciseId: 'chest_01', sets: 3, reps: 12), // Отжимания
             ExerciseTemplate(exerciseId: 'shoulders_02', sets: 3, reps: 15), // Махи в стороны
             ExerciseTemplate(exerciseId: 'arms_05', sets: 3, reps: 10), // Французский жим
+            ExerciseTemplate(exerciseId: 'arms_06', sets: 3, reps: 12), // Разгибания на блоке
           ],
         ),
         2: WorkoutDayTemplate(
@@ -214,7 +228,9 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'back_10', sets: 3, reps: 5), // Становая тяга
             ExerciseTemplate(exerciseId: 'back_01', sets: 4, reps: 8), // Подтягивания
             ExerciseTemplate(exerciseId: 'back_04', sets: 3, reps: 10), // Тяга гантели
+            ExerciseTemplate(exerciseId: 'back_06', sets: 3, reps: 12), // Горизонтальная тяга
             ExerciseTemplate(exerciseId: 'arms_07', sets: 3, reps: 10), // Подъем штанги
+            ExerciseTemplate(exerciseId: 'arms_01', sets: 3, reps: 12), // Подъем гантелей
             ExerciseTemplate(exerciseId: 'arms_09', sets: 3, reps: 12), // Сгибания Зоттмана
           ],
         ),
@@ -225,7 +241,9 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'legs_01', sets: 4, reps: 8), // Приседания
             ExerciseTemplate(exerciseId: 'legs_05', sets: 3, reps: 10), // Жим ногами
             ExerciseTemplate(exerciseId: 'legs_07', sets: 3, reps: 12), // Сгибания ног
+            ExerciseTemplate(exerciseId: 'legs_02', sets: 3, reps: 12), // Выпады
             ExerciseTemplate(exerciseId: 'legs_08', sets: 4, reps: 20), // Подъемы на носки
+            ExerciseTemplate(exerciseId: 'legs_10', sets: 3, reps: 15), // Приседания с прыжком
             ExerciseTemplate(exerciseId: 'abs_02', sets: 3, reps: 60), // Планка
           ],
         ),
@@ -236,7 +254,9 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'chest_13', sets: 4, reps: 8), // Жим на наклонной
             ExerciseTemplate(exerciseId: 'shoulders_01', sets: 3, reps: 10), // Жим гантелей
             ExerciseTemplate(exerciseId: 'chest_15', sets: 3, reps: 6), // Отжимания с хлопком
+            ExerciseTemplate(exerciseId: 'chest_14', sets: 3, reps: 15), // Сведение в тренажере
             ExerciseTemplate(exerciseId: 'shoulders_04', sets: 3, reps: 12), // Разведение в наклоне
+            ExerciseTemplate(exerciseId: 'arms_05', sets: 3, reps: 10), // Французский жим
             ExerciseTemplate(exerciseId: 'arms_06', sets: 3, reps: 15), // Разгибания на блоке
           ],
         ),
@@ -247,7 +267,9 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'back_11', sets: 4, reps: 8), // Тяга Т-грифа
             ExerciseTemplate(exerciseId: 'back_02', sets: 3, reps: 10), // Подтягивания обратным хватом
             ExerciseTemplate(exerciseId: 'back_07', sets: 3, reps: 12), // Вертикальная тяга
+            ExerciseTemplate(exerciseId: 'back_05', sets: 3, reps: 10), // Тяга штанги в наклоне
             ExerciseTemplate(exerciseId: 'arms_02', sets: 3, reps: 12), // Молотковые сгибания
+            ExerciseTemplate(exerciseId: 'arms_03', sets: 3, reps: 12), // Концентрированные сгибания
             ExerciseTemplate(exerciseId: 'arms_08', sets: 3, reps: 15), // Обратные отжимания
           ],
         ),
@@ -258,7 +280,9 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'legs_04', sets: 3, reps: 8), // Становая на прямых ногах
             ExerciseTemplate(exerciseId: 'legs_09', sets: 3, reps: 10), // Болгарские выпады
             ExerciseTemplate(exerciseId: 'legs_06', sets: 3, reps: 15), // Разгибания ног
+            ExerciseTemplate(exerciseId: 'legs_03', sets: 3, reps: 12), // Приседания с гантелями
             ExerciseTemplate(exerciseId: 'legs_11', sets: 4, reps: 15), // Ягодичный мостик
+            ExerciseTemplate(exerciseId: 'legs_12', sets: 3, reps: 20), // Подъемы на носки сидя
             ExerciseTemplate(exerciseId: 'abs_04', sets: 3, reps: 20), // Русские скручивания
           ],
         ),
@@ -307,8 +331,10 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'chest_12', sets: 4, reps: 8), // Жим штанги
             ExerciseTemplate(exerciseId: 'back_01', sets: 3, reps: 8), // Подтягивания
             ExerciseTemplate(exerciseId: 'shoulders_01', sets: 3, reps: 10), // Жим гантелей
+            ExerciseTemplate(exerciseId: 'chest_08', sets: 3, reps: 12), // Разведение гантелей
             ExerciseTemplate(exerciseId: 'arms_01', sets: 3, reps: 12), // Подъем гантелей
             ExerciseTemplate(exerciseId: 'arms_06', sets: 3, reps: 15), // Разгибания на блоке
+            ExerciseTemplate(exerciseId: 'abs_01', sets: 3, reps: 20), // Скручивания
           ],
         ),
         2: WorkoutDayTemplate(
@@ -318,7 +344,9 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'legs_01', sets: 4, reps: 8), // Приседания
             ExerciseTemplate(exerciseId: 'legs_04', sets: 3, reps: 8), // Становая на прямых ногах
             ExerciseTemplate(exerciseId: 'legs_05', sets: 3, reps: 12), // Жим ногами
+            ExerciseTemplate(exerciseId: 'legs_02', sets: 3, reps: 12), // Выпады
             ExerciseTemplate(exerciseId: 'legs_08', sets: 4, reps: 20), // Подъемы на носки
+            ExerciseTemplate(exerciseId: 'legs_07', sets: 3, reps: 15), // Сгибания ног
             ExerciseTemplate(exerciseId: 'abs_01', sets: 3, reps: 20), // Скручивания
           ],
         ),
@@ -330,8 +358,10 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'chest_07', sets: 4, reps: 10), // Жим гантелей
             ExerciseTemplate(exerciseId: 'back_04', sets: 3, reps: 10), // Тяга гантели
             ExerciseTemplate(exerciseId: 'shoulders_02', sets: 3, reps: 15), // Махи в стороны
+            ExerciseTemplate(exerciseId: 'back_06', sets: 3, reps: 12), // Горизонтальная тяга
             ExerciseTemplate(exerciseId: 'arms_07', sets: 3, reps: 10), // Подъем штанги
             ExerciseTemplate(exerciseId: 'arms_05', sets: 3, reps: 12), // Французский жим
+            ExerciseTemplate(exerciseId: 'shoulders_04', sets: 3, reps: 12), // Разведение в наклоне
           ],
         ),
         5: WorkoutDayTemplate(dayNumber: 5, focus: 'Rest', exercises: [], isRestDay: true),
@@ -342,7 +372,9 @@ class TrainingSystemRepository {
             ExerciseTemplate(exerciseId: 'legs_10', sets: 4, reps: 10), // Румынская тяга
             ExerciseTemplate(exerciseId: 'legs_09', sets: 3, reps: 10), // Болгарские выпады
             ExerciseTemplate(exerciseId: 'legs_07', sets: 3, reps: 15), // Сгибания ног
+            ExerciseTemplate(exerciseId: 'legs_06', sets: 3, reps: 15), // Разгибания ног
             ExerciseTemplate(exerciseId: 'legs_11', sets: 3, reps: 15), // Ягодичный мостик
+            ExerciseTemplate(exerciseId: 'legs_08', sets: 3, reps: 20), // Подъемы на носки
             ExerciseTemplate(exerciseId: 'abs_03', sets: 3, reps: 15), // Подъем ног
           ],
         ),

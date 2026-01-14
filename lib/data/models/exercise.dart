@@ -18,11 +18,56 @@ enum ExerciseCategory {
   fullBody,
 }
 
+// Класс для подсказок по упражнению
+class ExerciseTip {
+  final String title;
+  final String description;
+  
+  const ExerciseTip({required this.title, required this.description});
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'title': title,
+      'description': description,
+    };
+  }
+  
+  factory ExerciseTip.fromJson(Map<String, dynamic> json) {
+    return ExerciseTip(
+      title: json['title'] as String,
+      description: json['description'] as String,
+    );
+  }
+}
+
+// Класс для типичных ошибок
+class CommonMistake {
+  final String mistake;
+  final String correction;
+  
+  const CommonMistake({required this.mistake, required this.correction});
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'mistake': mistake,
+      'correction': correction,
+    };
+  }
+  
+  factory CommonMistake.fromJson(Map<String, dynamic> json) {
+    return CommonMistake(
+      mistake: json['mistake'] as String,
+      correction: json['correction'] as String,
+    );
+  }
+}
+
 class Exercise {
   final String id;
   final String name;
   final String description;
-  final String instructions;
+  final String instructions; // Сохраняем для обратной совместимости
+  final List<String> instructionSteps; // Пошаговые инструкции
   final List<ExerciseCategory> categories;
   final List<String> primaryMuscleGroups;
   final List<String> secondaryMuscleGroups;
@@ -31,6 +76,9 @@ class Exercise {
   final List<String> contraindications;
   final String? imageUrl;
   final String? videoUrl;
+  final String? gifUrl; // URL GIF-изображения упражнения
+  final List<ExerciseTip> tips; // Подсказки по выполнению
+  final List<CommonMistake> commonMistakes; // Типичные ошибки
   final bool isBodyweight;
   final bool isWarmup;
   final bool isCooldown;
@@ -44,6 +92,7 @@ class Exercise {
     required this.name,
     required this.description,
     required this.instructions,
+    this.instructionSteps = const [],
     required this.categories,
     required this.primaryMuscleGroups,
     this.secondaryMuscleGroups = const [],
@@ -52,6 +101,9 @@ class Exercise {
     this.contraindications = const [],
     this.imageUrl,
     this.videoUrl,
+    this.gifUrl,
+    this.tips = const [],
+    this.commonMistakes = const [],
     this.isBodyweight = false,
     this.isWarmup = false,
     this.isCooldown = false,
@@ -67,15 +119,30 @@ class Exercise {
       name: '',
       description: '',
       instructions: '',
+      instructionSteps: const [],
       categories: [],
       primaryMuscleGroups: [],
       difficulty: ExerciseDifficulty.beginner,
+      tips: const [],
+      commonMistakes: const [],
     );
   }
 
   // Для удобства создаем геттеры
   bool get isCardio => categories.contains(ExerciseCategory.cardio);
   bool get isForBeginners => difficulty == ExerciseDifficulty.beginner;
+  
+  // Получить пошаговые инструкции (используем instructionSteps если есть, иначе разбиваем instructions)
+  List<String> get effectiveInstructionSteps {
+    if (instructionSteps.isNotEmpty) {
+      return instructionSteps;
+    }
+    // Если instructionSteps пуст, разбиваем instructions на шаги
+    if (instructions.isNotEmpty) {
+      return instructions.split('\n').where((step) => step.trim().isNotEmpty).toList();
+    }
+    return [];
+  }
   
   // Метод для проверки доступности упражнения при ограничениях здоровья
   bool isSafeFor(List<String> healthRestrictions) {
@@ -95,6 +162,7 @@ class Exercise {
       'name': name,
       'description': description,
       'instructions': instructions,
+      'instructionSteps': instructionSteps,
       'categories': categories.map((e) => e.name).toList(),
       'primaryMuscleGroups': primaryMuscleGroups,
       'secondaryMuscleGroups': secondaryMuscleGroups,
@@ -103,6 +171,9 @@ class Exercise {
       'contraindications': contraindications,
       'imageUrl': imageUrl,
       'videoUrl': videoUrl,
+      'gifUrl': gifUrl,
+      'tips': tips.map((tip) => tip.toJson()).toList(),
+      'commonMistakes': commonMistakes.map((mistake) => mistake.toJson()).toList(),
       'isBodyweight': isBodyweight,
       'isWarmup': isWarmup,
       'isCooldown': isCooldown,
@@ -114,11 +185,25 @@ class Exercise {
   }
 
   factory Exercise.fromJson(Map<String, dynamic> json) {
+    // Обратная совместимость: если instructionSteps нет, но есть instructions, разбиваем их
+    List<String> instructionSteps = [];
+    if (json['instructionSteps'] != null) {
+      instructionSteps = (json['instructionSteps'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList() ?? [];
+    } else if (json['instructions'] != null) {
+      final instructions = json['instructions'] as String;
+      if (instructions.isNotEmpty) {
+        instructionSteps = instructions.split('\n').where((step) => step.trim().isNotEmpty).toList();
+      }
+    }
+    
     return Exercise(
       id: json['id'] as String,
       name: json['name'] as String,
       description: json['description'] as String,
-      instructions: json['instructions'] as String,
+      instructions: json['instructions'] as String? ?? '',
+      instructionSteps: instructionSteps,
       categories: (json['categories'] as List<dynamic>?)
           ?.map((e) {
             final categoryName = e as String;
@@ -146,6 +231,13 @@ class Exercise {
           .toList() ?? [],
       imageUrl: json['imageUrl'] as String?,
       videoUrl: json['videoUrl'] as String?,
+      gifUrl: json['gifUrl'] as String?,
+      tips: (json['tips'] as List<dynamic>?)
+          ?.map((e) => ExerciseTip.fromJson(e as Map<String, dynamic>))
+          .toList() ?? [],
+      commonMistakes: (json['commonMistakes'] as List<dynamic>?)
+          ?.map((e) => CommonMistake.fromJson(e as Map<String, dynamic>))
+          .toList() ?? [],
       isBodyweight: json['isBodyweight'] as bool? ?? false,
       isWarmup: json['isWarmup'] as bool? ?? false,
       isCooldown: json['isCooldown'] as bool? ?? false,

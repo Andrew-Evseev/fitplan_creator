@@ -74,25 +74,138 @@ class _ReorderableExerciseListState extends State<ReorderableExerciseList>
 
   @override
   Widget build(BuildContext context) {
-    return ReorderableListView(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      onReorder: (oldIndex, newIndex) {
-        if (oldIndex < newIndex) {
-          newIndex -= 1;
+    // Разделяем упражнения на группы
+    final warmupExercises = <WorkoutExercise>[];
+    final mainExercises = <WorkoutExercise>[];
+    final cooldownExercises = <WorkoutExercise>[];
+    
+    final repository = WorkoutRepository();
+    for (final exercise in widget.exercises) {
+      final exerciseDetails = repository.getExerciseById(exercise.exerciseId);
+      if (exerciseDetails.id.isNotEmpty) {
+        if (exerciseDetails.isWarmup) {
+          warmupExercises.add(exercise);
+        } else if (exerciseDetails.isCooldown) {
+          cooldownExercises.add(exercise);
+        } else {
+          mainExercises.add(exercise);
         }
-        widget.onReorder(oldIndex, newIndex);
-      },
-      children: [
-        for (int index = 0; index < widget.exercises.length; index++)
-          _buildExerciseCard(
-            widget.exercises[index],
-            index,
-            key: Key('${widget.workoutId}-$index'),
-          ),
-      ],
+      } else {
+        // Если упражнение не найдено, проверяем по ID
+        if (exercise.exerciseId.startsWith('warmup_')) {
+          warmupExercises.add(exercise);
+        } else if (exercise.exerciseId.startsWith('cooldown_')) {
+          cooldownExercises.add(exercise);
+        } else {
+          mainExercises.add(exercise);
+        }
+      }
+    }
+    
+    // Строим список с заголовками групп
+    final children = <Widget>[];
+    
+    // Разминка
+    if (warmupExercises.isNotEmpty) {
+      children.add(_buildSectionHeader('Разминка', warmupExercises.length));
+      for (int i = 0; i < warmupExercises.length; i++) {
+        final exerciseIndex = widget.exercises.indexOf(warmupExercises[i]);
+        children.add(_buildExerciseCard(
+          warmupExercises[i],
+          exerciseIndex,
+          key: Key('${widget.workoutId}-warmup-$exerciseIndex'),
+        ));
+      }
+    }
+    
+    // Основные упражнения
+    if (mainExercises.isNotEmpty) {
+      children.add(_buildSectionHeader('Основные упражнения', mainExercises.length));
+      for (int i = 0; i < mainExercises.length; i++) {
+        final exerciseIndex = widget.exercises.indexOf(mainExercises[i]);
+        children.add(_buildExerciseCard(
+          mainExercises[i],
+          exerciseIndex,
+          key: Key('${widget.workoutId}-main-$exerciseIndex'),
+        ));
+      }
+    }
+    
+    // Заминка
+    if (cooldownExercises.isNotEmpty) {
+      children.add(_buildSectionHeader('Заминка', cooldownExercises.length));
+      for (int i = 0; i < cooldownExercises.length; i++) {
+        final exerciseIndex = widget.exercises.indexOf(cooldownExercises[i]);
+        children.add(_buildExerciseCard(
+          cooldownExercises[i],
+          exerciseIndex,
+          key: Key('${widget.workoutId}-cooldown-$exerciseIndex'),
+        ));
+      }
+    }
+    
+    // Используем Column вместо ReorderableListView для поддержки заголовков
+    // Но сохраняем возможность переупорядочивания внутри каждой секции
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(
+        children: children,
+      ),
     );
+  }
+  
+  Widget _buildSectionHeader(String title, int count) {
+    return Container(
+      key: ValueKey('header-$title'),
+      margin: const EdgeInsets.only(top: 16, bottom: 8, left: 8, right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.grey.shade200,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            title == 'Разминка' ? Icons.wb_sunny_outlined :
+            title == 'Заминка' ? Icons.wb_twilight_outlined :
+            Icons.fitness_center,
+            size: 18,
+            color: title == 'Разминка' ? Colors.orange :
+                   title == 'Заминка' ? Colors.blue :
+                   Colors.blue.shade700,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade800,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            '$count ${_getExerciseWord(count)}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  String _getExerciseWord(int count) {
+    if (count % 10 == 1 && count % 100 != 11) return 'упражнение';
+    if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) {
+      return 'упражнения';
+    }
+    return 'упражнений';
   }
 
   Widget _buildExerciseCard(WorkoutExercise exercise, int index, {required Key key}) {

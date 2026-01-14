@@ -760,22 +760,97 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
       buffer.writeln('Статус: ${workout.completed ? "✅ Выполнено" : "⏳ Ожидание"}');
       buffer.writeln();
       
-      for (int i = 0; i < workout.exercises.length; i++) {
-        final exercise = workout.exercises[i];
+      // Разделяем упражнения на группы
+      final warmupExercises = <WorkoutExercise>[];
+      final mainExercises = <WorkoutExercise>[];
+      final cooldownExercises = <WorkoutExercise>[];
+      
+      for (final exercise in workout.exercises) {
         final exDetails = getExerciseById(exercise.exerciseId);
-        
         if (exDetails.id.isNotEmpty) {
-          buffer.writeln('${i + 1}. ${exDetails.name}');
-          buffer.writeln('   Подходы: ${exercise.sets} × ${exercise.reps > 0 ? exercise.reps : "до утомления"}');
-          buffer.writeln('   Отдых: ${exercise.restTime} сек');
-          buffer.writeln('   Выполнено: ${exercise.completedSets.where((c) => c).length}/${exercise.sets}');
-          
-          if (exDetails.description.isNotEmpty) {
-            buffer.writeln('   Описание: ${exDetails.description}');
+          if (exDetails.isWarmup || exercise.exerciseId.startsWith('warmup_')) {
+            warmupExercises.add(exercise);
+          } else if (exDetails.isCooldown || exercise.exerciseId.startsWith('cooldown_')) {
+            cooldownExercises.add(exercise);
+          } else {
+            mainExercises.add(exercise);
           }
-          
-          buffer.writeln();
+        } else {
+          // Если упражнение не найдено, проверяем по ID
+          if (exercise.exerciseId.startsWith('warmup_')) {
+            warmupExercises.add(exercise);
+          } else if (exercise.exerciseId.startsWith('cooldown_')) {
+            cooldownExercises.add(exercise);
+          } else {
+            mainExercises.add(exercise);
+          }
         }
+      }
+      
+      // Разминка
+      if (warmupExercises.isNotEmpty) {
+        buffer.writeln('РАЗМИНКА:');
+        buffer.writeln('─' * 30);
+        int exerciseNum = 1;
+        for (final exercise in warmupExercises) {
+          final exDetails = getExerciseById(exercise.exerciseId);
+          if (exDetails.id.isNotEmpty) {
+            buffer.writeln('$exerciseNum. ${exDetails.name}');
+            buffer.writeln('   Подходы: ${exercise.sets} × ${exercise.reps > 0 ? exercise.reps : "до утомления"}');
+            buffer.writeln('   Отдых: ${exercise.restTime} сек');
+            buffer.writeln('   Выполнено: ${exercise.completedSets.where((c) => c).length}/${exercise.sets}');
+            if (exDetails.description.isNotEmpty) {
+              buffer.writeln('   Описание: ${exDetails.description}');
+            }
+            buffer.writeln();
+            exerciseNum++;
+          }
+        }
+        buffer.writeln();
+      }
+      
+      // Основные упражнения
+      if (mainExercises.isNotEmpty) {
+        buffer.writeln('ОСНОВНЫЕ УПРАЖНЕНИЯ:');
+        buffer.writeln('─' * 30);
+        int exerciseNum = 1;
+        for (final exercise in mainExercises) {
+          final exDetails = getExerciseById(exercise.exerciseId);
+          if (exDetails.id.isNotEmpty) {
+            buffer.writeln('$exerciseNum. ${exDetails.name}');
+            buffer.writeln('   Подходы: ${exercise.sets} × ${exercise.reps > 0 ? exercise.reps : "до утомления"}');
+            buffer.writeln('   Отдых: ${exercise.restTime} сек');
+            buffer.writeln('   Выполнено: ${exercise.completedSets.where((c) => c).length}/${exercise.sets}');
+            if (exDetails.description.isNotEmpty) {
+              buffer.writeln('   Описание: ${exDetails.description}');
+            }
+            buffer.writeln();
+            exerciseNum++;
+          }
+        }
+        buffer.writeln();
+      }
+      
+      // Заминка
+      if (cooldownExercises.isNotEmpty) {
+        buffer.writeln('ЗАМИНКА:');
+        buffer.writeln('─' * 30);
+        int exerciseNum = 1;
+        for (final exercise in cooldownExercises) {
+          final exDetails = getExerciseById(exercise.exerciseId);
+          if (exDetails.id.isNotEmpty) {
+            buffer.writeln('$exerciseNum. ${exDetails.name}');
+            buffer.writeln('   Подходы: ${exercise.sets} × ${exercise.reps > 0 ? exercise.reps : "до утомления"}');
+            buffer.writeln('   Отдых: ${exercise.restTime} сек');
+            buffer.writeln('   Выполнено: ${exercise.completedSets.where((c) => c).length}/${exercise.sets}');
+            if (exDetails.description.isNotEmpty) {
+              buffer.writeln('   Описание: ${exDetails.description}');
+            }
+            buffer.writeln();
+            exerciseNum++;
+          }
+        }
+        buffer.writeln();
       }
       
       buffer.writeln('─' * 50);

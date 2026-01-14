@@ -5,14 +5,14 @@ import 'package:go_router/go_router.dart';
 import 'package:fitplan_creator/core/widgets/custom_button.dart';
 import 'package:fitplan_creator/features/planner/providers/planner_provider.dart';
 import 'package:fitplan_creator/features/profile/providers/profile_provider.dart';
+import 'package:fitplan_creator/features/questionnaire/providers/questionnaire_provider.dart';
 import 'package:fitplan_creator/features/planner/presentation/widgets/exercise_search_sheet.dart';
 import 'package:fitplan_creator/features/planner/presentation/widgets/reorderable_exercise_list.dart';
 import 'package:fitplan_creator/features/planner/presentation/widgets/training_system_info_card.dart';
-import 'package:fitplan_creator/features/planner/presentation/widgets/muscle_groups_visualization.dart';
+import 'package:fitplan_creator/features/planner/presentation/widgets/exercise_preview_dialog.dart';
 import 'package:fitplan_creator/data/models/workout_plan.dart';
 import 'package:fitplan_creator/data/models/workout_exercise.dart';
 import 'package:fitplan_creator/data/models/exercise.dart';
-import 'package:fitplan_creator/data/models/user_preferences.dart';
 import 'package:fitplan_creator/data/repositories/workout_repository.dart';
 
 class PlannerScreen extends ConsumerStatefulWidget {
@@ -59,6 +59,9 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                 case 'info':
                   _showPlanInfo(context, plan);
                   break;
+                case 'edit_questionnaire':
+                  _editQuestionnaire(context, ref);
+                  break;
                 case 'regenerate':
                   _showRegeneratePlanDialog(context, ref);
                   break;
@@ -84,6 +87,16 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
                     Icon(Icons.info_outline, size: 20),
                     SizedBox(width: 12),
                     Text('Информация о плане'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'edit_questionnaire',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, size: 20),
+                    SizedBox(width: 12),
+                    Text('Изменить анкету'),
                   ],
                 ),
               ),
@@ -296,12 +309,19 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             ),
           ),
         ),
-        title: Text(
-          workout.name.isNotEmpty ? workout.name : dayName,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              workout.name.isNotEmpty ? workout.name : dayName,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 4),
+            _buildMuscleGroupsChips(workout),
+          ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -359,10 +379,8 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
         ),
         children: [
           // Drag-and-drop список упражнений
-          Container(
-            constraints: const BoxConstraints(
-              maxHeight: 400.0, // Ограничиваем максимальную высоту
-            ),
+          SizedBox(
+            height: workout.exercises.length > 3 ? 400.0 : null,
             child: ReorderableExerciseList(
               exercises: workout.exercises,
               workoutId: workout.id,
@@ -433,6 +451,119 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
     );
   }
 
+  // Построить чипсы групп мышц для заголовка
+  Widget _buildMuscleGroupsChips(Workout workout) {
+    final repository = WorkoutRepository();
+    final muscleGroups = <String>{};
+    
+    // Собираем уникальные группы мышц из упражнений (только основные, не разминка/заминка)
+    for (final exercise in workout.exercises) {
+      final exerciseDetails = repository.getExerciseById(exercise.exerciseId);
+      if (exerciseDetails.id.isNotEmpty && 
+          !exerciseDetails.isWarmup && 
+          !exerciseDetails.isCooldown) {
+        muscleGroups.addAll(exerciseDetails.primaryMuscleGroups);
+      }
+    }
+    
+    if (muscleGroups.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    // Группируем похожие группы мышц
+    final groupedMuscles = <String>[];
+    final processed = <String>{};
+    
+    for (final muscle in muscleGroups) {
+      if (processed.contains(muscle)) continue;
+      
+      final muscleLower = muscle.toLowerCase();
+      String mainGroup = muscle;
+      
+      // Определяем основную группу
+      if (muscleLower.contains('груд') || muscleLower.contains('chest')) {
+        mainGroup = 'Грудь';
+      } else if (muscleLower.contains('спин') || muscleLower.contains('широчайш') || muscleLower.contains('back')) {
+        mainGroup = 'Спина';
+      } else if (muscleLower.contains('ног') || muscleLower.contains('бедр') || muscleLower.contains('квадрицепс') || muscleLower.contains('ягодиц') || muscleLower.contains('leg')) {
+        mainGroup = 'Ноги';
+      } else if (muscleLower.contains('плеч') || muscleLower.contains('дельт') || muscleLower.contains('shoulder')) {
+        mainGroup = 'Плечи';
+      } else if (muscleLower.contains('бицепс') || muscleLower.contains('biceps')) {
+        mainGroup = 'Бицепсы';
+      } else if (muscleLower.contains('трицепс') || muscleLower.contains('triceps')) {
+        mainGroup = 'Трицепсы';
+      } else if (muscleLower.contains('пресс') || muscleLower.contains('abs') || muscleLower.contains('core')) {
+        mainGroup = 'Пресс';
+      }
+      
+      if (!groupedMuscles.contains(mainGroup)) {
+        groupedMuscles.add(mainGroup);
+      }
+      
+      // Помечаем все похожие группы как обработанные
+      for (final m in muscleGroups) {
+        final mLower = m.toLowerCase();
+        if ((muscleLower.contains('груд') && mLower.contains('груд')) ||
+            (muscleLower.contains('спин') && mLower.contains('спин')) ||
+            (muscleLower.contains('ног') && mLower.contains('ног')) ||
+            (muscleLower.contains('плеч') && mLower.contains('плеч')) ||
+            (muscleLower.contains('бицепс') && mLower.contains('бицепс')) ||
+            (muscleLower.contains('трицепс') && mLower.contains('трицепс')) ||
+            (muscleLower.contains('пресс') && mLower.contains('пресс'))) {
+          processed.add(m);
+        }
+      }
+    }
+    
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: groupedMuscles.take(4).map((muscle) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: _getMuscleGroupColor(muscle).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _getMuscleGroupColor(muscle).withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: Text(
+            muscle,
+            style: TextStyle(
+              fontSize: 10,
+              color: _getMuscleGroupColor(muscle),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+  
+  // Цвет группы мышц
+  Color _getMuscleGroupColor(String muscleGroup) {
+    final group = muscleGroup.toLowerCase();
+    if (group.contains('груд') || group.contains('chest')) {
+      return const Color(0xFFE91E63); // Розовый
+    } else if (group.contains('спин') || group.contains('back')) {
+      return const Color(0xFF2196F3); // Синий
+    } else if (group.contains('ног') || group.contains('leg')) {
+      return const Color(0xFFFF9800); // Оранжевый
+    } else if (group.contains('плеч') || group.contains('shoulder')) {
+      return const Color(0xFF9C27B0); // Фиолетовый
+    } else if (group.contains('бицепс') || group.contains('biceps')) {
+      return const Color(0xFF4CAF50); // Зеленый
+    } else if (group.contains('трицепс') || group.contains('triceps')) {
+      return const Color(0xFF00BCD4); // Голубой
+    } else if (group.contains('пресс') || group.contains('abs')) {
+      return const Color(0xFFFF5722); // Красный
+    }
+    return Colors.grey;
+  }
+
   // Цвет дня недели
   Color _getDayColor(int day) {
     final colors = [
@@ -448,6 +579,18 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   }
 
   // Показать диалог перегенерации плана
+  // Редактирование анкеты
+  void _editQuestionnaire(BuildContext context, WidgetRef ref) async {
+    // Загружаем текущие предпочтения в провайдер анкеты
+    final currentPlan = ref.read(plannerProvider);
+    if (currentPlan.userPreferences != null) {
+      ref.read(questionnaireProvider.notifier).updatePreferences(currentPlan.userPreferences!);
+    }
+    
+    // Переходим на экран анкеты
+    context.go('/questionnaire');
+  }
+
   void _showRegeneratePlanDialog(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
@@ -460,15 +603,43 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
             child: const Text('Отмена'),
           ),
           ElevatedButton(
-            onPressed: () {
-              ref.read(plannerProvider.notifier).resetPlan();
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('План перегенерирован'),
-                  duration: Duration(seconds: 2),
+              
+              // Показываем индикатор загрузки
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => const Center(
+                  child: CircularProgressIndicator(),
                 ),
               );
+              
+              try {
+                // Перегенерируем план
+                await ref.read(plannerProvider.notifier).resetPlan();
+                
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('План успешно перегенерирован'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Ошибка при перегенерации: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Перегенерировать'),
           ),
@@ -671,299 +842,10 @@ class _PlannerScreenState extends ConsumerState<PlannerScreen> {
   void _showExerciseDetails(BuildContext context, WidgetRef ref, WorkoutExercise exercise) {
     final exerciseDetails = ref.read(plannerProvider.notifier).getExerciseById(exercise.exerciseId);
     
-    showModalBottomSheet(
+    // Используем новый улучшенный диалог
+    ExercisePreviewDialog.show(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        final plan = ref.read(plannerProvider);
-        final userRestrictions = plan.userPreferences?.healthRestrictions
-            .where((r) => r != HealthRestriction.none)
-            .map((r) => r.displayName)
-            .toList() ?? [];
-        
-        return SingleChildScrollView(
-          child: Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              
-              Center(
-                child: Text(
-                  exerciseDetails.name,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Видео/изображение если есть
-              if (exerciseDetails.videoUrl != null || exerciseDetails.imageUrl != null) ...[
-                if (exerciseDetails.videoUrl != null)
-                  Container(
-                    width: double.infinity,
-                    height: 200,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.videocam, size: 48, color: Colors.grey),
-                        const SizedBox(height: 8),
-                        TextButton.icon(
-                          icon: const Icon(Icons.play_circle_outline),
-                          label: const Text('Открыть видео'),
-                          onPressed: () {
-                            // TODO: Открыть видео в браузере или встроенном плеере
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Видео: ${exerciseDetails.videoUrl}'),
-                                action: SnackBarAction(
-                                  label: 'Открыть',
-                                  onPressed: () {
-                                    // Можно использовать url_launcher для открытия ссылки
-                                  },
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  )
-                else if (exerciseDetails.imageUrl != null)
-                  Container(
-                    width: double.infinity,
-                    height: 200,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        exerciseDetails.imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Center(
-                            child: Icon(Icons.image_not_supported, size: 48),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 20),
-              ],
-              
-              if (exerciseDetails.description.isNotEmpty)
-                Text(
-                  exerciseDetails.description,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                  ),
-                ),
-              
-              const SizedBox(height: 20),
-              
-              const Text(
-                'Параметры выполнения:',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 12),
-              
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildDetailCard('Подходы', '${exercise.sets}', Icons.repeat),
-                  _buildDetailCard('Повторения', '${exercise.reps}', Icons.format_list_numbered),
-                  _buildDetailCard('Отдых', '${exercise.restTime} сек', Icons.timer),
-                ],
-              ),
-              
-              const SizedBox(height: 20),
-              
-              // Визуализация задействованных мышц
-              if (exerciseDetails.primaryMuscleGroups.isNotEmpty ||
-                  exerciseDetails.secondaryMuscleGroups.isNotEmpty)
-                MuscleGroupsVisualization(
-                  primaryMuscles: exerciseDetails.primaryMuscleGroups,
-                  secondaryMuscles: exerciseDetails.secondaryMuscleGroups,
-                ),
-              if (exerciseDetails.primaryMuscleGroups.isNotEmpty ||
-                  exerciseDetails.secondaryMuscleGroups.isNotEmpty)
-                const SizedBox(height: 20),
-              
-              if (exerciseDetails.instructions.isNotEmpty) ...[
-                const Text(
-                  'Техника выполнения:',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  exerciseDetails.instructions,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-              
-              // Противопоказания
-              if (exerciseDetails.contraindications.isNotEmpty)
-                Builder(
-                  builder: (context) {
-                    final hasMatchingRestrictions = exerciseDetails.contraindications
-                        .any((contra) => userRestrictions.contains(contra));
-                    
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: hasMatchingRestrictions 
-                                ? Colors.orange[50] 
-                                : Colors.grey[50],
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: hasMatchingRestrictions 
-                                  ? Colors.orange[300]! 
-                                  : Colors.grey[300]!,
-                              width: hasMatchingRestrictions ? 2 : 1,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    hasMatchingRestrictions 
-                                        ? Icons.warning_amber_rounded 
-                                        : Icons.info_outline,
-                                    color: hasMatchingRestrictions 
-                                        ? Colors.orange[700] 
-                                        : Colors.grey[700],
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Противопоказания:',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: hasMatchingRestrictions 
-                                          ? Colors.orange[900] 
-                                          : Colors.grey[800],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              if (hasMatchingRestrictions) ...[
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange[100],
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.error_outline,
-                                        color: Colors.orange,
-                                        size: 16,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          'У вас есть ограничения, которые совпадают с противопоказаниями этого упражнения. '
-                                          'Рекомендуется проконсультироваться с врачом перед выполнением.',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.orange[900],
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: exerciseDetails.contraindications.map((contra) {
-                                  final isUserRestriction = userRestrictions.contains(contra);
-                                  return Chip(
-                                    label: Text(contra),
-                                    backgroundColor: isUserRestriction 
-                                        ? Colors.orange[200] 
-                                        : Colors.grey[200],
-                                    labelStyle: TextStyle(
-                                      fontSize: 12,
-                                      color: isUserRestriction 
-                                          ? Colors.orange[900] 
-                                          : Colors.grey[700],
-                                      fontWeight: isUserRestriction 
-                                          ? FontWeight.w600 
-                                          : FontWeight.normal,
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                    );
-                  },
-                ),
-              
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Закрыть'),
-                ),
-              ),
-            ],
-          ),
-        ),
-        );
-      },
+      exercise: exerciseDetails,
     );
   }
 

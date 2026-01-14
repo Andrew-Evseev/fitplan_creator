@@ -196,6 +196,11 @@ class QuestionnaireNotifier extends StateNotifier<UserPreferences> {
   void reset() {
     state = const UserPreferences();
   }
+  
+  // Обновить все предпочтения из существующего объекта
+  void updatePreferences(UserPreferences preferences) {
+    state = preferences;
+  }
 }
 
 final questionnaireProvider = StateNotifierProvider<QuestionnaireNotifier, UserPreferences>(

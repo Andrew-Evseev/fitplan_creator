@@ -56,22 +56,72 @@ class ExerciseSelectionRules {
   }
 
   /// Проверить безопасность упражнения для пользователя
-  static bool isExerciseSafeForUser(String exerciseId, UserPreferences prefs) {
+  static bool isExerciseSafeForUser(String exerciseId, UserPreferences prefs, {List<Exercise>? allExercises}) {
     // Если нет ограничений по здоровью, упражнение безопасно
     if (prefs.healthRestrictions.isEmpty || 
-        prefs.healthRestrictions.any((r) => r.displayName == 'Нет ограничений')) {
+        prefs.healthRestrictions.contains(HealthRestriction.none)) {
       return true;
     }
 
-    // Проверяем каждое ограничение
+      // Получаем упражнение для проверки противопоказаний
+      Exercise? exercise;
+      if (allExercises != null) {
+        exercise = allExercises.firstWhere(
+          (e) => e.id == exerciseId,
+          orElse: () => Exercise.empty(),
+        );
+        if (exercise.id.isEmpty) {
+          exercise = null;
+        }
+      }
+
+    // Проверяем каждое ограничение пользователя
     for (final restriction in prefs.healthRestrictions) {
+      if (restriction == HealthRestriction.none) continue;
+      
+      // 1. Проверяем жестко заданный список противопоказаний
       final restrictedExercises = _healthContraindications[restriction.displayName] ?? [];
       if (restrictedExercises.contains(exerciseId)) {
         return false;
       }
+      
+      // 2. Проверяем противопоказания из модели упражнения
+      if (exercise != null && exercise.contraindications.isNotEmpty) {
+        // Маппинг HealthRestriction на строки противопоказаний
+        final restrictionKey = _getRestrictionKey(restriction);
+        if (exercise.contraindications.contains(restrictionKey)) {
+          return false;
+        }
+      }
     }
 
     return true;
+  }
+  
+  /// Преобразовать HealthRestriction в ключ противопоказания
+  static String _getRestrictionKey(HealthRestriction restriction) {
+    switch (restriction) {
+      case HealthRestriction.back:
+        return 'back';
+      case HealthRestriction.knees:
+        return 'knees';
+      case HealthRestriction.shoulders:
+        return 'shoulders';
+      case HealthRestriction.neck:
+        return 'neck';
+      case HealthRestriction.wrist:
+        return 'wrist';
+      case HealthRestriction.elbow:
+        return 'elbow';
+      case HealthRestriction.hip:
+        return 'hip';
+      case HealthRestriction.highBloodPressure:
+        return 'high_blood_pressure';
+      case HealthRestriction.heartIssues:
+        return 'heart_issues';
+      case HealthRestriction.none:
+        return '';
+    }
   }
 
   /// Получить замену упражнения на основе доступного оборудования

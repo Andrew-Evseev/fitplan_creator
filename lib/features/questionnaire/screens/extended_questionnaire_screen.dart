@@ -462,52 +462,67 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           ),
           const SizedBox(height: 32),
           
-          // Цели тренировок
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            childAspectRatio: 1.5,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            children: UserGoal.values.map((goal) {
-              final isSelected = prefs.goal == goal;
-              return GestureDetector(
-                onTap: () {
-                  ref.read(questionnaireProvider.notifier).setGoal(goal);
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isSelected ? Colors.blue[50] : Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected ? Colors.blue : Colors.grey[300]!,
-                      width: isSelected ? 2 : 1,
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _getGoalIcon(goal),
-                        color: isSelected ? Colors.blue : Colors.grey,
-                        size: 32,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        goal.displayName,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: isSelected ? Colors.blue : Colors.grey[700],
+          // Горизонтальная строка для целей тренировок (одинаковый размер)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: UserGoal.values.map((goal) {
+                final isSelected = prefs.goal == goal;
+                return Container(
+                  width: 160,
+                  height: 120,
+                  margin: const EdgeInsets.only(right: 12),
+                  child: GestureDetector(
+                    onTap: () {
+                      ref.read(questionnaireProvider.notifier).setGoal(goal);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.blue : Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? Colors.blue : Colors.grey[300]!,
+                          width: isSelected ? 2 : 1,
                         ),
                       ),
-                    ],
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _getGoalIcon(goal),
+                            color: isSelected ? Colors.white : Colors.grey,
+                            size: 28,
+                          ),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: Center(
+                              child: Text(
+                                goal.displayName,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: isSelected ? Colors.white : Colors.grey[800],
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          if (isSelected)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 4),
+                              child: Icon(Icons.check_circle, color: Colors.white, size: 18),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              );
-            }).toList(),
+                );
+              }).toList(),
+            ),
           ),
           
           const SizedBox(height: 32),
@@ -530,38 +545,62 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           ),
           const SizedBox(height: 32),
           
+          // Вертикальный список для уровня активности (один столбец)
           Column(
             children: ActivityLevel.values.map((level) {
               final isSelected = prefs.activityLevel == level;
-              return Card(
+              return Container(
                 margin: const EdgeInsets.only(bottom: 12),
-                color: isSelected ? Colors.blue[50] : null,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: isSelected ? Colors.blue : Colors.grey[300]!,
-                    width: isSelected ? 2 : 1,
-                  ),
-                ),
-                child: ListTile(
-                  leading: Icon(
-                    Icons.directions_walk,
-                    color: isSelected ? Colors.blue : Colors.grey,
-                  ),
-                  title: Text(
-                    level.displayName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.blue : Colors.black,
-                    ),
-                  ),
-                  subtitle: Text(level.description),
-                  trailing: isSelected
-                      ? const Icon(Icons.check_circle, color: Colors.blue)
-                      : null,
+                child: GestureDetector(
                   onTap: () {
                     ref.read(questionnaireProvider.notifier).setActivityLevel(level);
                   },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.blue[50] : Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? Colors.blue : Colors.grey[300]!,
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.directions_walk,
+                          color: isSelected ? Colors.blue : Colors.grey,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                level.displayName,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: isSelected ? Colors.blue : Colors.black,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                level.description,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isSelected)
+                          const Icon(Icons.check_circle, color: Colors.blue, size: 24),
+                      ],
+                    ),
+                  ),
                 ),
               );
             }).toList(),
@@ -598,55 +637,90 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           ),
           const SizedBox(height: 32),
           
-          // Уровень опыта
-          Column(
-            children: ExperienceLevel.values.map((level) {
-              final isSelected = prefs.experienceLevel == level;
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                color: isSelected ? Colors.blue[50] : null,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: isSelected ? Colors.blue : Colors.grey[300]!,
-                    width: isSelected ? 2 : 1,
-                  ),
-                ),
-                child: ListTile(
-                  leading: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSelected ? Colors.blue : Colors.grey[200],
-                    ),
-                    child: Center(
-                      child: Text(
-                        (ExperienceLevel.values.indexOf(level) + 1).toString(),
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.grey[600],
-                          fontWeight: FontWeight.bold,
+          // Горизонтальная строка для уровня подготовки
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: ExperienceLevel.values.map((level) {
+                final isSelected = prefs.experienceLevel == level;
+                return Container(
+                  width: 180,
+                  height: 100,
+                  margin: const EdgeInsets.only(right: 12),
+                  child: GestureDetector(
+                    onTap: () {
+                      ref.read(questionnaireProvider.notifier).setExperienceLevel(level);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.blue[50] : Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? Colors.blue : Colors.grey[300]!,
+                          width: isSelected ? 2 : 1,
                         ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isSelected ? Colors.blue : Colors.grey[200],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    (ExperienceLevel.values.indexOf(level) + 1).toString(),
+                                    style: TextStyle(
+                                      color: isSelected ? Colors.white : Colors.grey[600],
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  level.displayName,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                    color: isSelected ? Colors.blue : Colors.black,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (isSelected)
+                                const Icon(Icons.check_circle, color: Colors.blue, size: 18),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Expanded(
+                            child: Text(
+                              level.description,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  title: Text(
-                    level.displayName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.blue : Colors.black,
-                    ),
-                  ),
-                  subtitle: Text(level.description),
-                  trailing: isSelected
-                      ? const Icon(Icons.check_circle, color: Colors.blue)
-                      : null,
-                  onTap: () {
-                    ref.read(questionnaireProvider.notifier).setExperienceLevel(level);
-                  },
-                ),
-              );
-            }).toList(),
+                );
+              }).toList(),
+            ),
           ),
           
           const SizedBox(height: 32),
@@ -669,61 +743,70 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           ),
           const SizedBox(height: 32),
           
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 3,
-            childAspectRatio: 0.8,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            children: BodyType.values.map((type) {
-              final isSelected = prefs.bodyType == type;
-              return GestureDetector(
-                onTap: () {
-                  ref.read(questionnaireProvider.notifier).setBodyType(type);
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isSelected ? Colors.blue[50] : Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected ? Colors.blue : Colors.grey[300]!,
-                      width: isSelected ? 2 : 1,
+          // Горизонтальная строка для типа телосложения
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: BodyType.values.map((type) {
+                final isSelected = prefs.bodyType == type;
+                return Container(
+                  width: 180,
+                  margin: const EdgeInsets.only(right: 12),
+                  child: GestureDetector(
+                    onTap: () {
+                      ref.read(questionnaireProvider.notifier).setBodyType(type);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.blue[50] : Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? Colors.blue : Colors.grey[300]!,
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _getBodyTypeIcon(type),
+                            color: isSelected ? Colors.blue : Colors.grey,
+                            size: 28,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            type.displayName,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              color: isSelected ? Colors.blue : Colors.grey[700],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            type.description,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (isSelected)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 4),
+                              child: Icon(Icons.check_circle, color: Colors.blue, size: 18),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _getBodyTypeIcon(type),
-                        color: isSelected ? Colors.blue : Colors.grey,
-                        size: 32,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        type.displayName,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                          color: isSelected ? Colors.blue : Colors.grey[700],
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        type.description,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
+                );
+              }).toList(),
+            ),
           ),
         ],
       ),
@@ -758,68 +841,61 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           ),
           const SizedBox(height: 32),
           
-          // Выбор места тренировок
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            childAspectRatio: 1.5,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            children: TrainingLocation.values.map((location) {
-              final isSelected = selectedLocation == location;
-              return GestureDetector(
-                onTap: () {
-                  ref.read(questionnaireProvider.notifier).setTrainingLocation(location);
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isSelected ? _getLocationColor(location) : Colors.grey[50],
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isSelected ? _getLocationColor(location) : Colors.grey[300]!,
-                      width: isSelected ? 3 : 1,
+          // Горизонтальная строка для места тренировок
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: TrainingLocation.values.map((location) {
+                final isSelected = selectedLocation == location;
+                return Container(
+                  width: 160,
+                  margin: const EdgeInsets.only(right: 12),
+                  child: GestureDetector(
+                    onTap: () {
+                      ref.read(questionnaireProvider.notifier).setTrainingLocation(location);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isSelected ? _getLocationColor(location) : Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? _getLocationColor(location) : Colors.grey[300]!,
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _getLocationIcon(location),
+                            color: isSelected ? Colors.white : _getLocationColor(location),
+                            size: 28,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            location.displayName,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isSelected ? Colors.white : Colors.grey[800],
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (isSelected)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 4),
+                              child: Icon(Icons.check_circle, color: Colors.white, size: 18),
+                            ),
+                        ],
+                      ),
                     ),
-                    boxShadow: isSelected ? [
-                      BoxShadow(
-                        color: _getLocationColor(location).withOpacity(0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ] : null,
                   ),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        location.displayName,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isSelected ? Colors.white : Colors.grey[800],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Icon(
-                        _getLocationIcon(location),
-                        color: isSelected ? Colors.white : _getLocationColor(location),
-                        size: 32,
-                      ),
-                      if (isSelected) ...[
-                        const SizedBox(height: 12),
-                        const Icon(
-                          Icons.check_circle,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
+                );
+              }).toList(),
+            ),
           ),
           
           const SizedBox(height: 32),
@@ -985,22 +1061,25 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           ),
           const SizedBox(height: 16),
           
+          // Ограничения в 2 колонки
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 2,
-            childAspectRatio: 2,
+            childAspectRatio: 3.5,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
             children: HealthRestriction.values
                 .where((r) => r != HealthRestriction.none)
                 .map((restriction) {
               final isSelected = selectedRestrictions.contains(restriction);
+              final displayText = _getHealthRestrictionWithExamples(restriction);
               return GestureDetector(
                 onTap: () {
                   ref.read(questionnaireProvider.notifier).toggleHealthRestriction(restriction);
                 },
                 child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: isSelected ? Colors.orange[50] : Colors.grey[50],
                     borderRadius: BorderRadius.circular(12),
@@ -1009,21 +1088,24 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
                       width: isSelected ? 2 : 1,
                     ),
                   ),
-                  padding: const EdgeInsets.all(12),
                   child: Row(
                     children: [
                       Icon(
-                        isSelected ? Icons.check_box : Icons.check_box_outline_blank,
+                        isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
                         color: isSelected ? Colors.orange : Colors.grey,
+                        size: 18,
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          restriction.displayName,
+                          displayText,
                           style: TextStyle(
                             fontWeight: FontWeight.w500,
+                            fontSize: 12,
                             color: isSelected ? Colors.orange[800] : Colors.grey[700],
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -1278,53 +1360,59 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
               fontWeight: FontWeight.w600,
             ),
           ),
+          const SizedBox(height: 8),
+          // Подсказка для выбора количества тренировок
+          _buildWorkoutFrequencyHint(prefs),
           const SizedBox(height: 16),
           
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 4,
-            childAspectRatio: 1,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            children: [2, 3, 4, 5, 6, 7].map((days) {
-              final isSelected = prefs.daysPerWeek == days;
-              return GestureDetector(
-                onTap: () {
-                  ref.read(questionnaireProvider.notifier).setDaysPerWeek(days);
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isSelected ? Colors.blue : Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected ? Colors.blue : Colors.grey[300]!,
-                      width: isSelected ? 3 : 1,
+          // Горизонтальная строка для количества дней (компактные карточки)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [2, 3, 4, 5, 6, 7].map((days) {
+                final isSelected = prefs.daysPerWeek == days;
+                return Container(
+                  width: 80,
+                  height: 80,
+                  margin: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () {
+                      ref.read(questionnaireProvider.notifier).setDaysPerWeek(days);
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isSelected ? Colors.blue : Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? Colors.blue : Colors.grey[300]!,
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '$days',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? Colors.white : Colors.grey[700],
+                            ),
+                          ),
+                          Text(
+                            'дней',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isSelected ? Colors.white : Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        '$days',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: isSelected ? Colors.white : Colors.grey[700],
-                        ),
-                      ),
-                      Text(
-                        'дней',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isSelected ? Colors.white : Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
+                );
+              }).toList(),
+            ),
           ),
 
           const SizedBox(height: 32),
@@ -1337,22 +1425,28 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
               fontWeight: FontWeight.w600,
             ),
           ),
+          const SizedBox(height: 8),
+          // Подсказка для выбора длительности
+          _buildDurationHint(prefs),
           const SizedBox(height: 16),
           
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 3,
-            childAspectRatio: 1.2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            children: [
-              _buildDurationOption(prefs, 30, '30 мин', Icons.timer),
-              _buildDurationOption(prefs, 45, '45 мин', Icons.timer),
-              _buildDurationOption(prefs, 60, '60 мин', Icons.timer),
-              _buildDurationOption(prefs, 75, '75 мин', Icons.timer),
-              _buildDurationOption(prefs, 90, '90 мин', Icons.timer),
-            ],
+          // Горизонтальная строка для длительности (компактные карточки)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildDurationOption(prefs, 30, '30 мин', Icons.timer),
+                _buildDurationOption(prefs, 45, '45 мин', Icons.timer),
+                _buildDurationOption(prefs, 60, '60 мин', Icons.timer),
+                _buildDurationOption(prefs, 75, '75 мин', Icons.timer),
+                _buildDurationOption(prefs, 90, '90 мин', Icons.timer),
+              ].map((widget) => Container(
+                width: 100,
+                height: 100,
+                margin: const EdgeInsets.only(right: 8),
+                child: widget,
+              )).toList(),
+            ),
           ),
           
           const SizedBox(height: 32),
@@ -1478,23 +1572,24 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? Colors.blue : Colors.grey[300]!,
-            width: isSelected ? 3 : 1,
+            width: isSelected ? 2 : 1,
           ),
         ),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
               color: isSelected ? Colors.white : Colors.grey[700],
-              size: 24,
+              size: 20,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               label,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: isSelected ? Colors.white : Colors.grey[700],
               ),
@@ -1545,6 +1640,140 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
       case TrainingLocation.bodyweight:
         return Icons.self_improvement;
     }
+  }
+  
+  // Получить название ограничения с примерами
+  String _getHealthRestrictionWithExamples(HealthRestriction restriction) {
+    switch (restriction) {
+      case HealthRestriction.back:
+        return 'Проблемы со спиной (протрузии, грыжи)';
+      case HealthRestriction.knees:
+        return 'Проблемы с коленями (артроз, травмы)';
+      case HealthRestriction.shoulders:
+        return 'Проблемы с плечами (вывихи, артрит)';
+      case HealthRestriction.neck:
+        return 'Проблемы с шеей (остеохондроз)';
+      case HealthRestriction.wrist:
+        return 'Проблемы с запястьями (туннельный синдром)';
+      case HealthRestriction.elbow:
+        return 'Проблемы с локтями (эпикондилит)';
+      case HealthRestriction.hip:
+        return 'Проблемы с тазобедренными суставами (коксартроз)';
+      case HealthRestriction.highBloodPressure:
+        return 'Высокое давление (гипертония)';
+      case HealthRestriction.heartIssues:
+        return 'Проблемы с сердцем (аритмия, ИБС)';
+      case HealthRestriction.none:
+        return 'Нет ограничений';
+    }
+  }
+  
+  // Подсказка для выбора частоты тренировок
+  Widget _buildWorkoutFrequencyHint(UserPreferences prefs) {
+    final goal = prefs.goal;
+    final level = prefs.experienceLevel;
+    
+    String hintText = '';
+    if (goal == UserGoal.muscleGain) {
+      if (level == ExperienceLevel.beginner) {
+        hintText = '💡 Для набора мышечной массы новичкам рекомендуется 3 тренировки в неделю по 60 минут';
+      } else if (level == ExperienceLevel.intermediate || level == ExperienceLevel.advanced) {
+        hintText = '💡 Для набора мышечной массы среднему/опытному уровню рекомендуется 4-5 тренировок в неделю по 75-90 минут';
+      }
+    } else if (goal == UserGoal.weightLoss) {
+      hintText = '💡 Для похудения рекомендуется 4-5 тренировок в неделю по 45-60 минут';
+    } else if (goal == UserGoal.endurance) {
+      hintText = '💡 Для развития выносливости рекомендуется 4-6 тренировок в неделю по 45-60 минут';
+    } else if (goal == UserGoal.strength) {
+      hintText = '💡 Для увеличения силы рекомендуется 3-4 тренировки в неделю по 60-90 минут';
+    } else {
+      hintText = '💡 Для общей физической формы рекомендуется 3-4 тренировки в неделю по 45-60 минут';
+    }
+    
+    if (hintText.isEmpty) return const SizedBox.shrink();
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue[200]!),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.lightbulb_outline, color: Colors.blue[700], size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              hintText,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.blue[900],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Подсказка для выбора длительности тренировки
+  Widget _buildDurationHint(UserPreferences prefs) {
+    final goal = prefs.goal;
+    final level = prefs.experienceLevel;
+    final daysPerWeek = prefs.daysPerWeek;
+    
+    String hintText = '';
+    if (goal == UserGoal.muscleGain) {
+      if (level == ExperienceLevel.beginner) {
+        hintText = '💡 Новичкам для набора массы достаточно 60 минут на тренировку';
+      } else if (level == ExperienceLevel.intermediate || level == ExperienceLevel.advanced) {
+        hintText = '💡 Среднему/опытному уровню для набора массы рекомендуется 75-90 минут на тренировку';
+      }
+    } else if (goal == UserGoal.weightLoss) {
+      hintText = '💡 Для похудения оптимально 45-60 минут на тренировку';
+    } else if (goal == UserGoal.endurance) {
+      hintText = '💡 Для выносливости оптимально 45-60 минут на тренировку';
+    } else if (goal == UserGoal.strength) {
+      hintText = '💡 Для увеличения силы рекомендуется 60-90 минут на тренировку';
+    } else {
+      hintText = '💡 Для общей физической формы оптимально 45-60 минут на тренировку';
+    }
+    
+    // Дополнительная подсказка в зависимости от количества дней
+    if (daysPerWeek != null) {
+      if (daysPerWeek >= 5) {
+        hintText += ' При ${daysPerWeek} тренировках в неделю можно уменьшить длительность до 45 минут';
+      } else if (daysPerWeek <= 3) {
+        hintText += ' При ${daysPerWeek} тренировках в неделю можно увеличить длительность до 75-90 минут';
+      }
+    }
+    
+    if (hintText.isEmpty) return const SizedBox.shrink();
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue[200]!),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.lightbulb_outline, color: Colors.blue[700], size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              hintText,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.blue[900],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

@@ -242,6 +242,20 @@ class PlanGenerator {
     return workouts;
   }
 
+  /// Определение целевого количества упражнений на основе уровня подготовки
+  int _getTargetExerciseCount(ExperienceLevel? level) {
+    switch (level) {
+      case ExperienceLevel.beginner:
+        return 4;
+      case ExperienceLevel.intermediate:
+        return 5;
+      case ExperienceLevel.advanced:
+        return 6;
+      default:
+        return 4; // По умолчанию для новичков
+    }
+  }
+
   /// Создание упражнений для дня
   Future<List<WorkoutExercise>> _createExercisesForDay(
     WorkoutDayTemplate dayTemplate,
@@ -250,12 +264,14 @@ class PlanGenerator {
     TrainingSystem system,
   ) async {
     final exercises = <WorkoutExercise>[];
+    final targetCount = _getTargetExerciseCount(prefs.experienceLevel);
     
     for (final template in dayTemplate.exercises) {
       // 1. Проверяем безопасность упражнения
       if (!ExerciseSelectionRules.isExerciseSafeForUser(
         template.exerciseId,
         prefs,
+        allExercises: allExercises,
       )) {
         continue; // Пропускаем небезопасные упражнения
       }
@@ -302,7 +318,12 @@ class PlanGenerator {
         prefs.bodyType,
       );
       
-      // 5. Создаем упражнение
+      // 5. Проверяем, что упражнение еще не добавлено (избегаем дубликатов)
+      if (exercises.any((e) => e.exerciseId == exerciseIdToUse)) {
+        continue; // Пропускаем дубликаты
+      }
+      
+      // 6. Создаем упражнение
       exercises.add(WorkoutExercise(
         exerciseId: exerciseIdToUse,
         sets: adaptedTemplate.sets,
@@ -349,12 +370,279 @@ class PlanGenerator {
       }
     }
     
-    // 5. Балансируем тренировку если нужно
+    // 5. Адаптируем количество упражнений под уровень подготовки
     if (exercises.isEmpty) {
       // Если упражнений нет, возвращаем пустой список
       return exercises;
     }
-    return _balanceWorkoutExercises(exercises, dayTemplate.focus, system);
+    
+    // Если упражнений меньше целевого - добавляем дополнительные
+    if (exercises.length < targetCount) {
+      final additionalExercises = await _getAdditionalExercises(
+        dayTemplate,
+        prefs,
+        allExercises,
+        system,
+        exercises.map((e) => e.exerciseId).toList(),
+        targetCount - exercises.length,
+      );
+      exercises.addAll(additionalExercises);
+    }
+    
+    // Балансируем тренировку с учетом целевого количества (только основные упражнения)
+    final mainExercises = _balanceWorkoutExercises(exercises, dayTemplate.focus, system, targetCount);
+    
+    // Добавляем разминку и заминку, затем сортируем в правильном порядке
+    return _addWarmupAndCooldown(mainExercises, prefs, allExercises);
+  }
+  
+  /// Получить дополнительные упражнения для достижения целевого количества
+  Future<List<WorkoutExercise>> _getAdditionalExercises(
+    WorkoutDayTemplate dayTemplate,
+    UserPreferences prefs,
+    List<Exercise> allExercises,
+    TrainingSystem system,
+    List<String> existingExerciseIds,
+    int neededCount,
+  ) async {
+    final additionalExercises = <WorkoutExercise>[];
+    
+    // Получаем доступные упражнения для фокуса дня
+    final focusMuscleGroups = _extractMuscleGroupsFromFocus(dayTemplate.focus);
+    
+    // Для дополнительных упражнений используем более мягкую фильтрацию
+    // Основные требования: безопасность и доступность оборудования
+    final availableExercises = allExercises.where((exercise) {
+      // Не включаем уже добавленные упражнения
+      if (existingExerciseIds.contains(exercise.id)) return false;
+      
+      // Обязательные проверки: безопасность и оборудование
+      if (!ExerciseSelectionRules.isExerciseSafeForUser(exercise.id, prefs, allExercises: allExercises)) {
+        return false;
+      }
+      
+      final equipmentAvailable = _isExerciseEquipmentAvailable(
+        exercise.id,
+        prefs.availableEquipment,
+        allExercises,
+      );
+      if (!equipmentAvailable) return false;
+      
+      // Исключаем разминку и заминку из основных упражнений
+      if (exercise.isWarmup || exercise.isCooldown) return false;
+      
+      return true; // Для дополнительных упражнений принимаем все безопасные и доступные
+    }).toList();
+    
+    // Фильтруем упражнения по соответствию фокусу дня (строгая фильтрация)
+    final focusFiltered = availableExercises.where((exercise) {
+      // Если фокус не определен, принимаем все упражнения
+      if (focusMuscleGroups.isEmpty) return true;
+      
+      // Проверяем соответствие основным группам мышц
+      final exerciseMuscles = [
+        ...exercise.primaryMuscleGroups,
+        ...exercise.secondaryMuscleGroups,
+      ];
+      
+      // Проверяем совпадение с фокусом дня
+      final matchesFocus = focusMuscleGroups.any((focusMuscle) {
+        return exerciseMuscles.any((exerciseMuscle) {
+          final focusLower = focusMuscle.toLowerCase();
+          final exerciseLower = exerciseMuscle.toLowerCase();
+          return exerciseLower.contains(focusLower) || 
+                 focusLower.contains(exerciseLower);
+        });
+      });
+      
+      // Также проверяем по категориям упражнений
+      final matchesByCategory = _matchesFocusByCategory(exercise, dayTemplate.focus);
+      
+      // Принимаем упражнение если оно соответствует фокусу или это fullBody упражнение
+      return matchesFocus || matchesByCategory || exercise.categories.contains(ExerciseCategory.fullBody);
+    }).toList();
+    
+    // Приоритизируем упражнения по соответствию фокусу дня
+    focusFiltered.sort((a, b) {
+      final aMatchesFocus = focusMuscleGroups.isEmpty || 
+          a.primaryMuscleGroups.any((m) => focusMuscleGroups.any((fm) => 
+            m.toLowerCase().contains(fm.toLowerCase()) || 
+            fm.toLowerCase().contains(m.toLowerCase()))) ||
+          a.categories.contains(ExerciseCategory.fullBody);
+      
+      final bMatchesFocus = focusMuscleGroups.isEmpty || 
+          b.primaryMuscleGroups.any((m) => focusMuscleGroups.any((fm) => 
+            m.toLowerCase().contains(fm.toLowerCase()) || 
+            fm.toLowerCase().contains(m.toLowerCase()))) ||
+          b.categories.contains(ExerciseCategory.fullBody);
+      
+      if (aMatchesFocus && !bMatchesFocus) return -1;
+      if (!aMatchesFocus && bMatchesFocus) return 1;
+      return 0;
+    });
+    
+    // Фильтруем по уровню подготовки
+    final levelFiltered = focusFiltered.where((exercise) {
+      switch (prefs.experienceLevel) {
+        case ExperienceLevel.beginner:
+          return exercise.difficulty == ExerciseDifficulty.beginner ||
+                 exercise.difficulty == ExerciseDifficulty.intermediate;
+        case ExperienceLevel.intermediate:
+          // Средний уровень может выполнять упражнения для начинающих и среднего уровня
+          return exercise.difficulty == ExerciseDifficulty.beginner ||
+                 exercise.difficulty == ExerciseDifficulty.intermediate;
+        case ExperienceLevel.advanced:
+          return true; // Опытные могут выполнять любые упражнения
+        default:
+          return exercise.difficulty == ExerciseDifficulty.beginner;
+      }
+    }).toList();
+    
+    // Выбираем нужное количество упражнений
+    // Приоритизируем упражнения, которые соответствуют уровню, но если их недостаточно - берем любые доступные
+    List<Exercise> exercisesToUse = levelFiltered;
+    if (levelFiltered.length < neededCount) {
+      // Если после фильтрации по уровню недостаточно упражнений, используем все доступные
+      // Это гарантирует, что мы добавим нужное количество упражнений
+      exercisesToUse = availableExercises;
+    }
+    
+    exercisesToUse.shuffle(); // Перемешиваем для разнообразия
+    final selected = exercisesToUse.take(neededCount);
+    
+    for (final exercise in selected) {
+      // Адаптируем параметры под пользователя
+      final defaultTemplate = ExerciseTemplate(
+        exerciseId: exercise.id,
+        sets: exercise.defaultSets,
+        reps: exercise.defaultReps,
+        restTime: exercise.restTimeSeconds,
+      );
+      
+      final adaptedTemplate = ExerciseSelectionRules.adaptExerciseForUser(
+        defaultTemplate,
+        prefs.experienceLevel ?? ExperienceLevel.beginner,
+        prefs.goal ?? UserGoal.generalFitness,
+        prefs.bodyType,
+      );
+      
+      // Проверяем, что упражнение еще не добавлено (избегаем дубликатов)
+      if (!additionalExercises.any((e) => e.exerciseId == exercise.id)) {
+        additionalExercises.add(WorkoutExercise(
+          exerciseId: exercise.id,
+          sets: adaptedTemplate.sets,
+          reps: adaptedTemplate.reps,
+          restTime: adaptedTemplate.restTime,
+        ));
+      }
+    }
+    
+    return additionalExercises;
+  }
+  
+  /// Извлечь группы мышц из фокуса дня
+  List<String> _extractMuscleGroupsFromFocus(String focus) {
+    final muscleGroups = <String>[];
+    final focusLower = focus.toLowerCase();
+    
+    // Основные группы мышц
+    if (focusLower.contains('грудь') || focusLower.contains('chest')) {
+      muscleGroups.add('Грудь');
+      muscleGroups.add('Грудные');
+    }
+    if (focusLower.contains('спина') || focusLower.contains('back')) {
+      muscleGroups.add('Спина');
+      muscleGroups.add('Широчайшие');
+    }
+    if (focusLower.contains('ноги') || focusLower.contains('legs')) {
+      muscleGroups.add('Ноги');
+      muscleGroups.add('Квадрицепсы');
+      muscleGroups.add('Бицепсы бедра');
+      muscleGroups.add('Ягодицы');
+    }
+    if (focusLower.contains('плечи') || focusLower.contains('shoulders')) {
+      muscleGroups.add('Плечи');
+      muscleGroups.add('Дельты');
+    }
+    if (focusLower.contains('бицепс') || focusLower.contains('biceps')) {
+      muscleGroups.add('Бицепсы');
+      muscleGroups.add('Бицепс');
+    }
+    if (focusLower.contains('трицепс') || focusLower.contains('triceps')) {
+      muscleGroups.add('Трицепсы');
+      muscleGroups.add('Трицепс');
+    }
+    if (focusLower.contains('пресс') || focusLower.contains('abs') || focusLower.contains('core')) {
+      muscleGroups.add('Пресс');
+    }
+    
+    return muscleGroups;
+  }
+  
+  /// Проверить соответствие упражнения фокусу дня по категориям
+  bool _matchesFocusByCategory(Exercise exercise, String focus) {
+    final focusLower = focus.toLowerCase();
+    
+    // Проверяем по категориям упражнения
+    if (focusLower.contains('ноги') || focusLower.contains('legs')) {
+      return exercise.categories.contains(ExerciseCategory.legs) ||
+             exercise.primaryMuscleGroups.any((m) => 
+               m.toLowerCase().contains('ноги') || 
+               m.toLowerCase().contains('бедр') ||
+               m.toLowerCase().contains('квадрицепс') ||
+               m.toLowerCase().contains('ягодиц'));
+    }
+    
+    if (focusLower.contains('грудь') || focusLower.contains('chest')) {
+      return exercise.categories.contains(ExerciseCategory.chest) ||
+             exercise.primaryMuscleGroups.any((m) => 
+               m.toLowerCase().contains('груд'));
+    }
+    
+    if (focusLower.contains('спина') || focusLower.contains('back')) {
+      return exercise.categories.contains(ExerciseCategory.back) ||
+             exercise.primaryMuscleGroups.any((m) => 
+               m.toLowerCase().contains('спин') ||
+               m.toLowerCase().contains('широчайш'));
+    }
+    
+    if (focusLower.contains('плечи') || focusLower.contains('shoulders')) {
+      return exercise.categories.contains(ExerciseCategory.shoulders) ||
+             exercise.primaryMuscleGroups.any((m) => 
+               m.toLowerCase().contains('плеч') ||
+               m.toLowerCase().contains('дельт'));
+    }
+    
+    if (focusLower.contains('руки') || focusLower.contains('arms') || 
+        focusLower.contains('бицепс') || focusLower.contains('трицепс')) {
+      return exercise.categories.contains(ExerciseCategory.arms) ||
+             exercise.primaryMuscleGroups.any((m) => 
+               m.toLowerCase().contains('бицепс') ||
+               m.toLowerCase().contains('трицепс') ||
+               m.toLowerCase().contains('предплеч'));
+    }
+    
+    if (focusLower.contains('пресс') || focusLower.contains('abs')) {
+      return exercise.categories.contains(ExerciseCategory.abs);
+    }
+    
+    // Для Push/Pull/Legs систем
+    if (focusLower.contains('push')) {
+      return exercise.categories.contains(ExerciseCategory.chest) ||
+             exercise.categories.contains(ExerciseCategory.shoulders) ||
+             (exercise.categories.contains(ExerciseCategory.arms) &&
+              exercise.primaryMuscleGroups.any((m) => 
+                m.toLowerCase().contains('трицепс')));
+    }
+    
+    if (focusLower.contains('pull')) {
+      return exercise.categories.contains(ExerciseCategory.back) ||
+             (exercise.categories.contains(ExerciseCategory.arms) &&
+              exercise.primaryMuscleGroups.any((m) => 
+                m.toLowerCase().contains('бицепс')));
+    }
+    
+    return false;
   }
 
   /// Адаптация недельной структуры под количество дней
@@ -473,36 +761,90 @@ class PlanGenerator {
     _allExercisesCache = null;
   }
 
-  /// Балансировка упражнений в тренировке
+  /// Балансировка упражнений в тренировке с учетом целевого количества
+  /// Исключает разминку и заминку из балансировки, но сохраняет их для последующей сортировки
   List<WorkoutExercise> _balanceWorkoutExercises(
     List<WorkoutExercise> exercises,
     String focus,
     TrainingSystem system,
+    int targetCount,
   ) {
-    if (exercises.length <= 4) return exercises;
+    // Разделяем на основные упражнения и разминку/заминку
+    final mainExercises = <WorkoutExercise>[];
+    final warmupCooldown = <WorkoutExercise>[];
     
-    // Балансируем только если много упражнений
-    final balanced = <WorkoutExercise>[];
-    
-    // Группируем по типу упражнений
-    final Map<String, List<WorkoutExercise>> grouped = {};
+    // Получаем все упражнения для проверки типа
+    final allExercises = _workoutRepository.allExercises;
     
     for (final exercise in exercises) {
-      final type = _getExerciseType(exercise.exerciseId);
-      grouped.putIfAbsent(type, () => []).add(exercise);
-    }
-    
-    // Выбираем по одному из каждой группы для баланса
-    for (final type in grouped.keys) {
-      final groupExercises = grouped[type];
-      if (groupExercises != null && groupExercises.isNotEmpty) {
-        // Выбираем упражнение с наибольшим приоритетом
-        balanced.add(groupExercises.first);
+      final exerciseDetails = allExercises.firstWhere(
+        (e) => e.id == exercise.exerciseId,
+        orElse: () => Exercise.empty(),
+      );
+      
+      // Проверяем по флагу, категориям и префиксу ID для надежности
+      final isWarmup = exerciseDetails.id.isNotEmpty && (
+        exerciseDetails.isWarmup || 
+        exerciseDetails.categories.contains(ExerciseCategory.warmup)
+      ) || exercise.exerciseId.startsWith('warmup_');
+      
+      final isCooldown = exerciseDetails.id.isNotEmpty && (
+        exerciseDetails.isCooldown || 
+        exerciseDetails.categories.contains(ExerciseCategory.cooldown)
+      ) || exercise.exerciseId.startsWith('cooldown_');
+      
+      if (exerciseDetails.id.isEmpty || isWarmup || isCooldown) {
+        warmupCooldown.add(exercise);
+      } else {
+        mainExercises.add(exercise);
       }
     }
     
-    // Ограничиваем максимум 6 упражнениями
-    return balanced.take(6).toList();
+    // Балансируем только основные упражнения
+    List<WorkoutExercise> balancedMain = mainExercises;
+    if (mainExercises.length > targetCount) {
+      // Если основных упражнений больше целевого - выбираем разнообразные упражнения
+      final balanced = <WorkoutExercise>[];
+      final usedTypes = <String>{};
+      
+      // Сначала добавляем по одному упражнению из каждой группы для разнообразия
+      for (final exercise in mainExercises) {
+        if (balanced.length >= targetCount) break;
+        
+        final type = _getExerciseType(exercise.exerciseId);
+        if (!usedTypes.contains(type)) {
+          balanced.add(exercise);
+          usedTypes.add(type);
+        }
+      }
+      
+      // Если еще не достигли целевого количества, добавляем оставшиеся упражнения
+      if (balanced.length < targetCount) {
+        for (final exercise in mainExercises) {
+          if (balanced.length >= targetCount) break;
+          if (!balanced.any((e) => e.exerciseId == exercise.exerciseId)) {
+            balanced.add(exercise);
+          }
+        }
+      }
+      
+      // Если все еще не достигли целевого количества, добавляем любые оставшиеся
+      if (balanced.length < targetCount) {
+        for (final exercise in mainExercises) {
+          if (balanced.length >= targetCount) break;
+          balanced.add(exercise);
+        }
+      }
+      
+      balancedMain = balanced.take(targetCount).toList();
+    }
+    
+    // Возвращаем все упражнения вместе (разминка/заминка будут отсортированы позже)
+    // ВАЖНО: возвращаем все упражнения, чтобы они не потерялись
+    final result = <WorkoutExercise>[];
+    result.addAll(warmupCooldown); // Добавляем разминку и заминку
+    result.addAll(balancedMain);   // Добавляем основные упражнения
+    return result;
   }
 
   /// Определение типа упражнения по ID
@@ -515,6 +857,115 @@ class PlanGenerator {
     if (exerciseId.startsWith('abs_')) return 'abs';
     if (exerciseId.startsWith('cardio_')) return 'cardio';
     return 'other';
+  }
+
+  /// Добавление разминки и заминки с правильной сортировкой
+  List<WorkoutExercise> _addWarmupAndCooldown(
+    List<WorkoutExercise> mainExercises,
+    UserPreferences prefs,
+    List<Exercise> allExercises,
+  ) {
+    final result = <WorkoutExercise>[];
+    
+    // Разделяем упражнения на категории
+    final warmupExercises = <WorkoutExercise>[];
+    final mainWorkoutExercises = <WorkoutExercise>[];
+    final cooldownExercises = <WorkoutExercise>[];
+    
+    // Сортируем существующие упражнения по категориям
+    for (final exercise in mainExercises) {
+      final exerciseDetails = allExercises.firstWhere(
+        (e) => e.id == exercise.exerciseId,
+        orElse: () => Exercise.empty(),
+      );
+      
+      if (exerciseDetails.id.isEmpty) {
+        // Если упражнение не найдено, проверяем по ID
+        if (exercise.exerciseId.startsWith('warmup_')) {
+          warmupExercises.add(exercise);
+        } else if (exercise.exerciseId.startsWith('cooldown_')) {
+          cooldownExercises.add(exercise);
+        } else {
+          mainWorkoutExercises.add(exercise);
+        }
+        continue;
+      }
+      
+      // Проверяем по флагу и категориям для надежности
+      final isWarmup = exerciseDetails.isWarmup || 
+          exerciseDetails.categories.contains(ExerciseCategory.warmup) ||
+          exercise.exerciseId.startsWith('warmup_');
+      final isCooldown = exerciseDetails.isCooldown || 
+          exerciseDetails.categories.contains(ExerciseCategory.cooldown) ||
+          exercise.exerciseId.startsWith('cooldown_');
+      
+      if (isWarmup) {
+        warmupExercises.add(exercise);
+      } else if (isCooldown) {
+        cooldownExercises.add(exercise);
+      } else {
+        mainWorkoutExercises.add(exercise);
+      }
+    }
+    
+    // Добавляем разминку, если её нет или недостаточно
+    if (warmupExercises.isEmpty || warmupExercises.length < 2) {
+      final warmupCount = warmupExercises.isEmpty ? 3 : (3 - warmupExercises.length);
+      final availableWarmup = _workoutRepository.getDefaultWarmup(count: warmupCount);
+      
+      for (final warmupExercise in availableWarmup) {
+        // Проверяем безопасность и доступность оборудования
+        if (ExerciseSelectionRules.isExerciseSafeForUser(warmupExercise.id, prefs, allExercises: allExercises) &&
+            _isExerciseEquipmentAvailable(
+              warmupExercise.id,
+              prefs.availableEquipment,
+              allExercises,
+            )) {
+          // Проверяем, что это упражнение еще не добавлено
+          if (!warmupExercises.any((e) => e.exerciseId == warmupExercise.id)) {
+            warmupExercises.add(WorkoutExercise(
+              exerciseId: warmupExercise.id,
+              sets: warmupExercise.defaultSets,
+              reps: warmupExercise.defaultReps,
+              restTime: warmupExercise.restTimeSeconds,
+            ));
+          }
+        }
+      }
+    }
+    
+    // Добавляем заминку, если её нет или недостаточно
+    if (cooldownExercises.isEmpty || cooldownExercises.length < 2) {
+      final cooldownCount = cooldownExercises.isEmpty ? 3 : (3 - cooldownExercises.length);
+      final availableCooldown = _workoutRepository.getDefaultCooldown(count: cooldownCount);
+      
+      for (final cooldownExercise in availableCooldown) {
+        // Проверяем безопасность и доступность оборудования
+        if (ExerciseSelectionRules.isExerciseSafeForUser(cooldownExercise.id, prefs, allExercises: allExercises) &&
+            _isExerciseEquipmentAvailable(
+              cooldownExercise.id,
+              prefs.availableEquipment,
+              allExercises,
+            )) {
+          // Проверяем, что это упражнение еще не добавлено
+          if (!cooldownExercises.any((e) => e.exerciseId == cooldownExercise.id)) {
+            cooldownExercises.add(WorkoutExercise(
+              exerciseId: cooldownExercise.id,
+              sets: cooldownExercise.defaultSets,
+              reps: cooldownExercise.defaultReps,
+              restTime: cooldownExercise.restTimeSeconds,
+            ));
+          }
+        }
+      }
+    }
+    
+    // Собираем результат в правильном порядке: разминка -> основные -> заминка
+    result.addAll(warmupExercises);
+    result.addAll(mainWorkoutExercises);
+    result.addAll(cooldownExercises);
+    
+    return result;
   }
 
   /// Расчет длительности тренировки
