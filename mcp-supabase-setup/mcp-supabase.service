@@ -1,0 +1,22 @@
+[Unit]
+Description=MCP Server for Supabase
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/mcp-supabase
+EnvironmentFile=/opt/mcp-supabase/.env
+ExecStart=/usr/bin/npx -y @supabase-community/mcp-server-supabase@latest \
+    --url=${SUPABASE_URL} \
+    --db-url=${SUPABASE_DB_URL} \
+    --service-role-key=${SUPABASE_SERVICE_ROLE_KEY} \
+    --port=${MCP_PORT} \
+    $(if [ "$MCP_READ_ONLY" = "true" ]; then echo "--read-only"; fi)
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

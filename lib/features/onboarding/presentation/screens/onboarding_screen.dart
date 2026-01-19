@@ -68,7 +68,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await prefs.setBool('onboarding_completed', true);
     
     if (mounted) {
-      context.go('/questionnaire');
+      context.go('/auth');
     }
   }
 

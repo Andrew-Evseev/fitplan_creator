@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:fitplan_creator/features/onboarding/presentation/screens/welcome_screen.dart';
 import 'package:fitplan_creator/features/onboarding/presentation/screens/loading_screen.dart';
 import 'package:fitplan_creator/features/onboarding/presentation/screens/onboarding_screen.dart';
+import 'package:fitplan_creator/features/auth/presentation/screens/auth_screen.dart';
 import 'package:fitplan_creator/features/planner/presentation/screens/planner_screen.dart';
 import 'package:fitplan_creator/features/profile/presentation/screens/profile_screen.dart';
 import 'package:fitplan_creator/features/questionnaire/screens/extended_questionnaire_screen.dart';
@@ -22,6 +23,11 @@ final router = GoRouter(
       path: '/onboarding',
       name: 'onboarding',
       builder: (context, state) => const OnboardingScreen(),
+    ),
+    GoRoute(
+      path: '/auth',
+      name: 'auth',
+      builder: (context, state) => const AuthScreen(),
     ),
     GoRoute(
       path: '/questionnaire',

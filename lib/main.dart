@@ -1,9 +1,15 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fitplan_creator/core/supabase/supabase_client.dart';
 import 'app/router.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Инициализация Supabase
+  await AppSupabaseClient.initialize();
+  
   runApp(
     const ProviderScope(
       child: MyApp(),

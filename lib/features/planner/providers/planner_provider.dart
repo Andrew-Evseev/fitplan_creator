@@ -9,8 +9,10 @@ import 'package:fitplan_creator/data/models/workout_exercise.dart';
 import 'package:fitplan_creator/data/models/training_system.dart';
 import 'package:fitplan_creator/data/repositories/workout_repository.dart';
 import 'package:fitplan_creator/data/repositories/training_system_repository.dart';
+import 'package:fitplan_creator/data/repositories/workout_plan_repository.dart';
 import 'package:fitplan_creator/features/planner/algorithms/plan_generator.dart';
 import 'package:fitplan_creator/core/analytics/analytics_service.dart';
+import 'package:fitplan_creator/core/supabase/supabase_client.dart' as supabase;
 
 class PlannerNotifier extends StateNotifier<WorkoutPlan> {
   PlannerNotifier(
@@ -35,6 +37,7 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
   final PlanGenerator planGenerator;
   final List<Exercise> _allExercises;
   final AnalyticsService _analytics = AnalyticsService();
+  final WorkoutPlanRepository _workoutPlanRepo = WorkoutPlanRepository();
 
   Future<void> _initialize() async {
     try {
@@ -86,9 +89,78 @@ class PlannerNotifier extends StateNotifier<WorkoutPlan> {
     }
   }
 
-  // Загрузка существующего плана
+  /// Загрузка существующего плана
   void loadPlan(WorkoutPlan plan) {
     state = plan;
+  }
+
+  /// Загрузить план из Supabase по ID
+  Future<void> loadPlanFromSupabase(String planId) async {
+    try {
+      final plan = await _workoutPlanRepo.getPlan(planId);
+      if (plan != null) {
+        state = plan;
+      } else {
+        throw Exception('План не найден');
+      }
+    } catch (e) {
+      debugPrint('Ошибка при загрузке плана из Supabase: $e');
+      rethrow;
+    }
+  }
+
+  /// Загрузить все планы пользователя из Supabase
+  Future<List<WorkoutPlan>> loadUserPlans() async {
+    try {
+      final userId = supabase.AppSupabaseClient.instance.currentUserId;
+      if (userId == null) {
+        throw Exception('Пользователь не авторизован');
+      }
+
+      return await _workoutPlanRepo.getPlans(userId);
+    } catch (e) {
+      debugPrint('Ошибка при загрузке планов пользователя: $e');
+      return [];
+    }
+  }
+
+  /// Сохранить текущий план в Supabase
+  Future<WorkoutPlan> savePlanToSupabase() async {
+    try {
+      final userId = supabase.AppSupabaseClient.instance.currentUserId;
+      if (userId == null) {
+        throw Exception('Пользователь не авторизован');
+      }
+
+      // Обновляем userId в плане
+      final planToSave = state.copyWith(userId: userId);
+      
+      // Сохраняем план
+      final savedPlan = await _workoutPlanRepo.savePlan(planToSave, userId);
+      
+      // Обновляем состояние
+      state = savedPlan;
+      
+      return savedPlan;
+    } catch (e) {
+      debugPrint('Ошибка при сохранении плана в Supabase: $e');
+      rethrow;
+    }
+  }
+
+  /// Удалить план из Supabase
+  Future<void> deletePlanFromSupabase(String planId) async {
+    try {
+      await _workoutPlanRepo.deletePlan(planId);
+      
+      // Если удаленный план был текущим, сбрасываем состояние
+      if (state.id == planId) {
+        await _generateDefaultPlan();
+      }
+    } catch (e) {
+      debugPrint('Ошибка при удалении плана из Supabase: $e');
+      rethrow;
+    }
   }
 
   // Генерация плана по умолчанию (fallback)

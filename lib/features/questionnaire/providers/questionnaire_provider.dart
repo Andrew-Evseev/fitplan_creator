@@ -1,9 +1,48 @@
 // lib/features/questionnaire/providers/questionnaire_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitplan_creator/data/models/user_preferences.dart';
+import 'package:fitplan_creator/data/repositories/preferences_repository.dart';
+import 'package:fitplan_creator/core/supabase/supabase_client.dart' as supabase;
 
 class QuestionnaireNotifier extends StateNotifier<UserPreferences> {
-  QuestionnaireNotifier() : super(const UserPreferences());
+  final _preferencesRepo = PreferencesRepository();
+  
+  QuestionnaireNotifier() : super(const UserPreferences()) {
+    _loadPreferences();
+  }
+
+  /// Загрузить предпочтения из Supabase
+  Future<void> _loadPreferences() async {
+    try {
+      final userId = supabase.AppSupabaseClient.instance.currentUserId;
+      if (userId == null) {
+        // Пользователь не авторизован, используем пустые предпочтения
+        return;
+      }
+
+      final preferences = await _preferencesRepo.getPreferences(userId);
+      if (preferences != null) {
+        state = preferences;
+      }
+    } catch (e) {
+      // В случае ошибки используем пустые предпочтения
+      print('Ошибка при загрузке предпочтений: $e');
+    }
+  }
+
+  /// Сохранить предпочтения в Supabase
+  Future<void> savePreferences() async {
+    try {
+      final userId = supabase.AppSupabaseClient.instance.currentUserId;
+      if (userId == null) {
+        throw Exception('Пользователь не авторизован');
+      }
+
+      await _preferencesRepo.savePreferences(state, userId);
+    } catch (e) {
+      throw Exception('Ошибка при сохранении предпочтений: $e');
+    }
+  }
 
   // ==================== БАЗОВЫЕ ДАННЫЕ ====================
   void setGender(Gender gender) {

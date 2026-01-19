@@ -174,6 +174,11 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
     );
 
     try {
+      // Сохраняем preferences в Supabase
+      print('💾 Сохранение preferences в Supabase...');
+      await ref.read(questionnaireProvider.notifier).savePreferences();
+      print('✅ Preferences сохранены');
+      
       // Генерируем план
       await ref.read(plannerProvider.notifier).setUserPreferences(prefs);
       
@@ -183,6 +188,7 @@ class _ExtendedQuestionnaireScreenState extends ConsumerState<ExtendedQuestionna
         GoRouter.of(context).go('/loading');
       }
     } catch (e) {
+      print('❌ Ошибка при сохранении preferences или создании плана: $e');
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
         _showValidationError('Ошибка при создании плана: $e');

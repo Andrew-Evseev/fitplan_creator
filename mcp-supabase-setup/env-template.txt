@@ -1,0 +1,27 @@
+# Конфигурация MCP сервера для Supabase
+# Скопируйте этот файл как .env в /opt/mcp-supabase/ и заполните ваши данные
+
+# URL Supabase API
+# Для внутреннего доступа через Docker network: http://kong:8000
+# Для внешнего доступа: https://your-domain.com
+SUPABASE_URL=http://kong:8000
+
+# Строка подключения к PostgreSQL
+# Формат: postgresql://postgres:[PASSWORD]@db:5432/postgres
+# Где db - имя контейнера PostgreSQL в Docker network
+SUPABASE_DB_URL=postgresql://postgres:your_password@db:5432/postgres
+
+# Service Role Key от Supabase
+# Можно найти в Supabase Dashboard -> Settings -> API -> service_role key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+
+# Project Reference ID (опционально)
+# Обычно используется для hosted Supabase, для self-hosted может не требоваться
+SUPABASE_PROJECT_REF=
+
+# Порт для MCP сервера (по умолчанию 3100)
+MCP_PORT=3100
+
+# Режим только для чтения (true/false)
+# Установите true, если хотите запретить изменения в БД
+MCP_READ_ONLY=false

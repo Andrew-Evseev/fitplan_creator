@@ -84,7 +84,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 text: 'Начать',
                 onPressed: () {
                   if (_hasSeenOnboarding) {
-                    context.push('/questionnaire');
+                    context.push('/auth');
                   } else {
                     context.push('/onboarding');
                   }
