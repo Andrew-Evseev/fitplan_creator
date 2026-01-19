@@ -4,7 +4,7 @@
 
 ### Шаг 1: Проверка триггера в Supabase
 
-1. Откройте Supabase Dashboard: http://176.124.208.227:8000
+1. Откройте Supabase Dashboard: http://YOUR_SERVER_IP:8000
 2. Перейдите в **Database** → **Triggers**
 3. Найдите триггер `on_auth_user_created`
 4. Убедитесь, что он:

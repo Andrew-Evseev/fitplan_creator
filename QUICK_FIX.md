@@ -5,7 +5,7 @@
 
 ## Решение 1: Отключить подтверждение email (для тестирования)
 
-1. Откройте Supabase Dashboard: http://176.124.208.227:8000
+1. Откройте Supabase Dashboard: http://YOUR_SERVER_IP:8000
 2. Перейдите в **Authentication** → **Settings** → **Email Auth**
 3. **Снимите галочку** "Enable email confirmations"
 4. Сохраните изменения

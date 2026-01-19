@@ -2,10 +2,10 @@
 
 ## Применение миграций
 
-1. Откройте Supabase Dashboard: http://176.124.208.227:8000
+1. Откройте Supabase Dashboard: http://YOUR_SERVER_IP:8000
 2. Войдите с учетными данными:
    - Логин: supabase
-   - Пароль: Ofsaid13
+   - Пароль: YOUR_SUPABASE_PASSWORD
 3. Перейдите в раздел **SQL Editor**
 4. Откройте файл `000_apply_all_migrations.sql`
 5. Скопируйте весь SQL код и вставьте в редактор

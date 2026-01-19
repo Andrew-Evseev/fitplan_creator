@@ -4,8 +4,8 @@
 
 ```bash
 # 1. Подключитесь к серверу
-ssh root@176.124.208.227
-# Пароль: cR7vd*MTzisEAD
+ssh root@YOUR_SERVER_IP
+# Пароль: YOUR_SSH_PASSWORD
 
 # 2. Найдите директорию Supabase
 cd /opt/supabase  # или другая директория
@@ -33,7 +33,7 @@ docker-compose logs -f auth
 ```yaml
 GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
 GOTRUE_MAILER_AUTOCONFIRM: "true"
-GOTRUE_SITE_URL: "http://176.124.208.227:3000"
+GOTRUE_SITE_URL: "http://YOUR_SERVER_IP:3000"
 ```
 
 ## Проверка после изменений

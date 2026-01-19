@@ -2,10 +2,10 @@
 
 ## Шаг 1: Применение миграций базы данных
 
-1. Откройте Supabase Dashboard: http://176.124.208.227:8000
+1. Откройте Supabase Dashboard: http://YOUR_SERVER_IP:8000
 2. Войдите с учетными данными:
    - Логин: supabase
-   - Пароль: Ofsaid13
+   - Пароль: YOUR_SUPABASE_PASSWORD
 3. Перейдите в раздел **SQL Editor**
 4. Откройте файл `supabase/migrations/000_apply_all_migrations.sql`
 5. Скопируйте весь SQL код и вставьте в редактор
@@ -33,9 +33,11 @@ flutter pub get
 
 ## Шаг 4: Проверка конфигурации
 
-Убедитесь, что в `lib/core/supabase/supabase_config.dart` правильно указаны:
-- URL Supabase: `http://176.124.208.227:8000`
-- Anon Key: [уже настроен]
+Убедитесь, что переменные окружения установлены:
+- SUPABASE_URL: URL вашего Supabase сервера
+- SUPABASE_ANON_KEY: Anon Key из Supabase Dashboard
+
+См. файл `.env.example` для примера конфигурации.
 
 ## Шаг 5: Запуск приложения
 

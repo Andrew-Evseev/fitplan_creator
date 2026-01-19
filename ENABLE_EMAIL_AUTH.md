@@ -10,8 +10,8 @@
 
 ### Шаг 1: Подключитесь к серверу
 ```bash
-ssh root@176.124.208.227
-# Пароль: cR7vd*MTzisEAD
+ssh root@YOUR_SERVER_IP
+# Пароль: YOUR_SSH_PASSWORD
 ```
 
 ### Шаг 2: Найдите файл docker-compose.yml
@@ -40,7 +40,7 @@ services:
       GOTRUE_MAILER_AUTOCONFIRM: "true"
       
       # URL вашего сайта
-      GOTRUE_SITE_URL: "http://176.124.208.227:3000"
+      GOTRUE_SITE_URL: "http://YOUR_SERVER_IP:3000"
       
       # Опционально: настройки SMTP (если нужна отправка email)
       # smtp_host: "smtp.example.com"
@@ -76,7 +76,7 @@ docker-compose logs auth
 ```env
 GOTRUE_EXTERNAL_EMAIL_ENABLED=true
 GOTRUE_MAILER_AUTOCONFIRM=true
-GOTRUE_SITE_URL=http://176.124.208.227:3000
+GOTRUE_SITE_URL=http://YOUR_SERVER_IP:3000
 ```
 
 Затем перезапустите:
@@ -91,7 +91,7 @@ docker-compose up -d
 
 ```bash
 # Подключитесь к серверу
-ssh root@176.124.208.227
+ssh root@YOUR_SERVER_IP
 
 # Найдите docker-compose.yml
 cd /opt/supabase  # или другая директория где Supabase

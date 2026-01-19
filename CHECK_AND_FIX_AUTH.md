@@ -62,7 +62,7 @@ curl http://localhost:9999/settings | grep -i email
 
 Или через браузер откройте:
 ```
-http://176.124.208.227:8000/auth/v1/settings
+http://YOUR_SERVER_IP:8000/auth/v1/settings
 ```
 
 В ответе должно быть `"external.email.enabled": true`
